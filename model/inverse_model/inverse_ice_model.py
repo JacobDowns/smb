@@ -139,6 +139,8 @@ class InverseIceModel(object):
 
         # Ice surface
         S = B + H_c
+        # Ice surface as DG function
+        S_dg = B + H
         # Time derivative
         dHdt = (H - H0) / dt
         # Overburden pressure
@@ -147,8 +149,12 @@ class InverseIceModel(object):
         P_w = Constant(self.constants['rho_w']*self.constants['g'])*B
         # Effective pressure
         N = P_0 - P_w
+        # Surface mass balance expression
+        self.adot_prime = model_inputs.adot_expression(S_dg, adot)
+
 
         self.S = S
+        self.S_dg = S_dg
         self.dHdt = dHdt
         self.dt = dt
         self.P_0 = P_0
@@ -169,8 +175,6 @@ class InverseIceModel(object):
         # Mass balance residual
         mass_form = MassForm(self)
         R_mass = mass_form.R_mass
-        # Mass balance form
-        self.adot_prime = mass_form.adot_prime
         # Function for writing adot prime
         self.adot_prime_func = Function(V_cg)
 
@@ -192,13 +196,13 @@ class InverseIceModel(object):
         problem = NonlinearVariationalProblem(R, U, bcs=[], J=J, form_compiler_parameters = ffc_options)
 
         # Solver parameters
-        self.snes_params = {'nonlinear_solver': 'snes',
-                      'snes_solver': {
-                       'relative_tolerance' : 1e-15,
-                       'absolute_tolerance' : 1e-5,
+        self.snes_params = {'nonlinear_solver': 'newton',
+                      'newton_solver': {
+                       'relative_tolerance' : 5e-14,
+                       'absolute_tolerance' : 7e-5,
                        'linear_solver': 'mumps',
                        'maximum_iterations': 100,
-                       'report' : False
+                       'report' : True
                        }}
 
         self.problem = problem
@@ -239,7 +243,7 @@ class InverseIceModel(object):
         # Write the time step we used
         dt_write = Function(self.V_r)
         dt_write.assign(self.dt)
-        #self.out_file.write(dt_write, 'dt')
+        self.out_file.write(dt_write, 'dt')
 
         # List of lapse rates
         rates = []
@@ -250,6 +254,7 @@ class InverseIceModel(object):
             # Update input functions which depend on length L
             self.update_inputs(self.t, dt)
 
+
             try:
                 solver = NonlinearVariationalSolver(self.problem)
                 solver.parameters.update(self.snes_params)
@@ -258,7 +263,7 @@ class InverseIceModel(object):
                 solver = NonlinearVariationalSolver(self.problem)
                 solver.parameters.update(self.snes_params)
                 solver.parameters['snes_solver']['error_on_nonconvergence'] = False
-                self.assigner.assign(self.U, [self.zero_guess, self.zero_guess,self.H0_c, self.H0, self.L0])
+                self.assigner.assign(self.U, [self.zero_guess, self.zero_guess,self.H0_c, self.H0, self.adot0])
                 solver.solve()
 
             # Update previous solutions
@@ -266,8 +271,9 @@ class InverseIceModel(object):
             # Print current time, max thickness, and adot parameter
             print self.t, self.H0.vector().max(), float(self.adot0)
             # Write inputs for this time
-            #self.checkpoint()
-
+            self.checkpoint()
+            self.adot_prime_func.assign(project(self.adot_prime, self.V_cg))
+            plot(self.adot_prime_func, interactive = False)
             rates.append(float(self.adot0))
             Ls.append(float(self.L))
 
@@ -290,8 +296,9 @@ class InverseIceModel(object):
 
     # Write inputs for forward model
     def checkpoint(self):
-        self.adot_prime_func.assign(project(self.adot_prime, self.V_cg))
-        self.out_file.write(self.adot_prime_func, "adot", self.t)
+        #self.adot_prime_func.assign(project(self.adot_prime, self.V_cg))
+        #self.out_file.write(self.adot_prime_func, "adot", self.t)
+        self.out_file.write(self.adot0, "adot0", self.t)
         self.out_file.flush()
 
 
@@ -302,7 +309,8 @@ class InverseIceModel(object):
       ### Write variables
       output_file.write(self.mesh, "mesh")
       output_file.write(self.H0, "H0")
-      output_file.write(self.L0, "L0")
+      output_file.write(self.H0_c, "H0_c")
+      output_file.write(project(self.L, self.V_r), "L0")
       output_file.write(self.boundaries, "boundaries")
       output_file.flush()
       output_file.close()

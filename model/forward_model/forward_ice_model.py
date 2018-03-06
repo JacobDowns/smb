@@ -132,6 +132,8 @@ class ForwardIceModel(object):
 
         # Ice surface
         S = B + H_c
+        # Ice surface as DG function
+        S_dg = B + H
         # Time derivatives
         dLdt = (L - L0) / dt
         dHdt = (H - H0) / dt
@@ -141,6 +143,11 @@ class ForwardIceModel(object):
         P_w = Constant(self.constants['rho_w']*self.constants['g'])*B
         # Effective pressure
         N = P_0 - P_w
+        # SMB expression
+        self.adot_prime = model_inputs.adot_expression(S_dg)
+        # SMB as a function
+        self.adot_prime_func = Function(self.V_cg)
+
 
         self.S = S
         self.dLdt = dLdt
@@ -182,6 +189,7 @@ class ForwardIceModel(object):
         ffc_options = {"optimize": True}
         problem = NonlinearVariationalProblem(R, U, bcs=[], J=J, form_compiler_parameters = ffc_options)
 
+        """
         # Solver parameters
         self.snes_params = {'nonlinear_solver': 'snes',
                       'snes_solver': {
@@ -189,6 +197,15 @@ class ForwardIceModel(object):
                       'absolute_tolerance' : 1e-5,
                        'linear_solver': 'mumps',
                        'maximum_iterations': 75,
+                       'report' : False
+                       }}"""
+
+        self.snes_params = {'nonlinear_solver': 'newton',
+                      'newton_solver': {
+                       'relative_tolerance' : 5e-14,
+                       'absolute_tolerance' : 7e-5,
+                       'linear_solver': 'mumps',
+                       'maximum_iterations': 100,
                        'report' : False
                        }}
 
@@ -222,6 +239,7 @@ class ForwardIceModel(object):
         self.B.assign(self.model_inputs.B)
         self.beta2.assign(self.model_inputs.beta2)
         self.adot.assign(self.model_inputs.adot)
+        self.adot_prime_func.assign(project(self.adot_prime, self.V_cg))
 
 
     def step(self):

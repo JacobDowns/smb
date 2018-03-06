@@ -1,4 +1,5 @@
 from dolfin import *
+import numpy as np
 
 """
 Model inputs that are common to both models. This includes initial ice thickness
@@ -31,8 +32,6 @@ class CommonInputs(object):
             def eval(self, values, x):
                 values[0] = 0.0
 
-                200.*cos(2*pi*x/ 100000.)
-
         # Basal traction
         class Beta2(Expression):
             def __init__(self, L_initial, degree=1):
@@ -61,7 +60,7 @@ class CommonInputs(object):
         self.input_file.read(self.H0, "/H0")
         self.input_file.read(self.H0_c, "/H0_c")
         self.input_file.read(self.L0, "/L0")
-        self.L_init = float(self.L0)
+        self.L_init = self.L0.vector().array()[0]
 
         # Input expressions
         self.B_exp = B(self.L_init, degree = 1)
@@ -79,17 +78,3 @@ class CommonInputs(object):
             if near(f.midpoint().x(), 0):
                # Divide
                self.boundaries[f] = 2
-
-        # Set function values
-        self.L = self.L_init
-
-
-    # Update Length
-    def update_L(self, L):
-        self.L = L
-
-        self.B_exp.L = self.L
-        self.beta2_exp.L = self.L
-
-        self.B.interpolate(self.B_exp)
-        self.beta2.interpolate(self.beta2_exp)

@@ -24,12 +24,12 @@ class MassForm(object):
         xsi = model.xsi
         # Boundary measure
         ds1 = dolfin.ds(subdomain_data = model.boundaries)
+        # SMB expression
+        adot_prime = model.adot_prime
+
 
         # Spatial coordinate
         x_spatial = SpatialCoordinate(model.mesh)
-        # SMB form
-        adot_prime = (1.0 - adot * x_spatial[0])
-        self.adot_prime = adot_prime
         # Grid velocity
         v = dLdt*x_spatial[0]
         # Flux velocity

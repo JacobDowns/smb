@@ -1,5 +1,5 @@
 from dolfin import *
-from common_inputs1 import *
+from common_inputs import *
 import numpy as np
 
 """
@@ -7,20 +7,34 @@ Model inputs for the reverse model. This includes common inputs as well as glaci
 length L.
 """
 
-class InverseInputs1(CommonInputs1):
+class InverseInputs(CommonInputs):
 
     def __init__(self, input_file_name):
         super(InverseInputs, self).__init__(input_file_name)
-        self.update(0.0)
+        self.L = self.get_L(0.)
+        self.dLdt = self.get_dLdt(0.)
 
-    # Update time
-    def update(self, t):
-        #self.dLdt = (2.0 / 100.0) * t
-        #self.L = self.L_init +  (1. / 100.0) * t**2
-        self.dLdt = -25.0
-        self.L = self.L_init + self.dLdt * t
-        #C = (2.*np.pi) / 1000.0
-        #M = 7500.0
-        #self.dLdt = M * C * np.cos(C * t)
-        #self.L = self.L_init + M * np.sin(C * t)
-        self.update_L(self.L)
+
+    ### Return L
+    def get_L(self, t):
+        return self.L_init
+        #return self.L_init - 25.*t
+
+
+    ### Return dLdt
+    def get_dLdt(self, t):
+        #return -25.
+        return 0.0
+
+
+    ### Get inputs for the inverse model
+    def assign_inputs(self, t, dt):
+        # Model inputs are assigned based on current time
+        self.B_exp.L = self.get_L(t)
+        self.beta2_exp.L = self.get_L(t)
+        self.B.interpolate(self.B_exp)
+        self.beta2.interpolate(self.beta2_exp)
+
+        # The value of L to use at this time step is the future L at t + dt
+        self.L = self.get_L(t + dt)
+        self.dLdt = self.get_dLdt(t + dt)

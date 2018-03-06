@@ -17,12 +17,14 @@ class InverseInputs1(CommonInputs1):
 
     ### Return L
     def get_L(self, t):
-        return self.L_init - 25.*t
+        #return self.L_init - 25.*t
+        return self.L_init - 25.*(t + 100.*np.log(100.) - 100.*np.log(100. + t))
 
 
     ### Return dLdt
     def get_dLdt(self, t):
-        return -25.
+        #return -25.
+        return -25*(t / (100. + t))
 
 
     ### Get inputs for the inverse model

@@ -1,7 +1,9 @@
 from model.forward_inputs1 import *
 from model.forward_model.forward_ice_model import *
 
-forward_inputs = ForwardInputs1('out/replay_bumps.hdf5')
+#forward_inputs = ForwardInputs1('out/replay_bumps.hdf5')
+#model = ForwardIceModel(forward_inputs, "out", "forward")
+forward_inputs = ForwardInputs1('out/replay_dependent.hdf5')
 model = ForwardIceModel(forward_inputs, "out", "forward")
 
 import numpy as np
@@ -23,7 +25,7 @@ xs_full = np.linspace(0., forward_inputs.L_init, 100)
 L_init = forward_inputs.L_init
 
 surface = project(model.S)
-adot = project(model.adot)
+adot = project(model.adot_prime_func)
 
 ph_bed, = ax[0].plot(xs_full, 250.*np.cos(2.*np.pi*xs_full / 100000.) - 250.0, 'b', linewidth = 2.5)
 ph_surface, = ax[0].plot(xs, surface.compute_vertex_values(), 'k', linewidth = 2.5)
@@ -59,12 +61,12 @@ def update(i):
 
     # Plot smb
     #ax[1].set_xlim(0, float(model.L0))
-    adot = project(model.adot)
+    adot = project(model.adot_prime_func)
     ph_adot.set_xdata(xs)
     ph_adot.set_ydata(adot.compute_vertex_values())
 
     # Plot terminus line
-    L_opt = L_init - 25. * model.t
+    L_opt = L_init -25.*(model.t + 100.*np.log(100.) - 100.*np.log(100. + model.t))
     ph_term.set_xdata([L_opt, L_opt])
     ph_term.set_ydata([-550., 4000.])
 
@@ -76,4 +78,4 @@ def update(i):
 #                               frames=100, interval=20, blit=True)
 
 anim = animation.FuncAnimation(fig, update, frames=299, interval=1, blit = True)
-anim.save('bumps.gif', dpi=100, writer='imagemagick')
+anim.save('dependent.gif', dpi=100, writer='imagemagick')

@@ -53,11 +53,13 @@ class CommonInputsRealistic(object):
         #self.input_file.read(self.H0, "/H0")
         #self.input_file.read(self.H0_c, "/H0_c")
         self.input_file.read(self.L0, "L0")
-        self.input_file.read(self.B.vector(), "B")
+        self.input_file.read(self.B, "B")
         self.L_init = self.L0.vector().array()[0]
 
         self.mesh_coords = self.mesh.coordinates()[:,0]
         self.B_interp = interpolate.interp1d(self.mesh_coords, project(self.B).compute_vertex_values())
+
+        print self.B_interp(self.mesh_coords)
 
         """
         xs = np.linspace(0., 1., 801)

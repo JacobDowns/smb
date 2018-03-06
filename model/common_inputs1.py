@@ -80,3 +80,8 @@ class CommonInputs1(object):
             if near(f.midpoint().x(), 0):
                # Divide
                self.boundaries[f] = 2
+
+
+    # Return an expression for the surface mass balance
+    def adot_expression(self, S, adot):
+        return Constant(-4.) * ((S / Constant(4000.0)) - Constant(1.))**2 + adot

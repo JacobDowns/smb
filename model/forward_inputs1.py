@@ -12,9 +12,9 @@ class ForwardInputs1(CommonInputs1):
 
         super(ForwardInputs1, self).__init__(input_file_name)
         # SMB
-        self.adot = Function(self.V_cg)
+        self.adot = Function(self.V_r)
         # Number of steps
-        self.N = self.input_file.attributes("adot")['count']
+        self.N = self.input_file.attributes("adot0")['count']
         # Time step
         dt = Function(self.V_r)
         self.input_file.read(dt, "dt")
@@ -23,10 +23,14 @@ class ForwardInputs1(CommonInputs1):
 
     # Update iteration and length
     def assign_inputs(self, i, L):
-        self.input_file.read(self.adot, "adot/vector_" + str(i))
+        self.input_file.read(self.adot, "adot0/vector_" + str(i))
 
         self.B_exp.L = L
         self.beta2_exp.L = L
 
         self.B.interpolate(self.B_exp)
         self.beta2.interpolate(self.beta2_exp)
+
+
+    def adot_expression(self, S):
+        return super(ForwardInputs1, self).adot_expression(S, self.adot)
