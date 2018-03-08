@@ -1,18 +1,17 @@
 from dolfin import *
 import numpy as np
-from scipy import interpolate
 
 """
 Model inputs that are common to both models. This includes initial ice thickness
 and length, length dependent bed elevation, and beta2.
 """
 
-class CommonInputsRealistic(object):
+class BedInputs(object):
 
-    def __init__(self, input_file_name, L_init = 350e3):
+    def __init__(self, inputs):
 
         # Load the mesh for the model
-        self.mesh = Mesh()
+        self.data_mesh = Mesh()
         self.input_file  = HDF5File(self.mesh.mpi_comm(), input_file_name, "r")
         self.input_file.read(self.mesh, "/mesh", False)
 
@@ -24,11 +23,22 @@ class CommonInputsRealistic(object):
         self.V_dg = FunctionSpace(self.mesh, self.E_dg)
         self.V_r = FunctionSpace(self.mesh, self.E_r)
 
+        # Bed elevation
+        class B(Expression):
+            def __init__(self, L_initial, degree=1):
+                self.L = L_initial
+                self.degree=degree
+
+            def eval(self, values, x):
+                #values[0] = 0.0
+                x = x[0] * self.L
+                values[0] = 250.*cos(2.*np.pi*x / 100000.) - 250.0
+
         # Basal traction
         class Beta2(Expression):
             def __init__(self, L_initial, degree=1):
                 self.L = L_initial
-                self.degree = degree
+                self.degree=degree
 
             def eval(self,values,x):
                 values[0] = 1e-3
@@ -45,58 +55,17 @@ class CommonInputsRealistic(object):
         self.B = Function(self.V_cg)
         # Basal traction
         self.beta2 = Function(self.V_cg)
-        # Initial glacier length
+        # Initial length
         self.L0 = Function(self.V_r)
-        # Domain length (The length of the flowline along which we have data)
-        self.domain_length = float(Function(self.V_r))
-        # Initial glacier length as float
-        self.L_init = L_init
 
         # Load initial thickness, velocity, and length from a file
         self.input_file.read(self.H0, "/H0")
         self.input_file.read(self.H0_c, "/H0_c")
-        self.input_file.read(self.L0, "L0")
-        self.input_file.read(self.B, "B")
-        self.input_file.read(self.domain_length, "domain_length")
+        self.input_file.read(self.L0, "/L0")
         self.L_init = self.L0.vector().array()[0]
-        print self.L_init
 
-
-        ### Interpolated bed
-        ########################################################################
-        self.mesh_coords = self.mesh.coordinates()[:,0]
-        self.B_interp = interpolate.interp1d(self.mesh_coords, project(self.B).compute_vertex_values())
-
-
-        ### Create the initial thickness profile
-        ########################################################################
-
-        # Bed elevation at desired margin position
-        B_margin = self.B_interp(self.L_init / self.domain_length)
-
-        # Surface expression
-        class SExp(Expression):
-            def eval(self,values,x):
-                values[0] = np.sqrt((3500.+ b_frac)**2*(1. - x[0])) + B_margin
-
-
-        S = project(SExp(degree = 1), self.V_cg)
-        # Initialize bed
-        self.assign_B(self.L_init)
-        # Compute initial thickness
-        self.H0_c.assign(project(S - self.B, self.V_cg))
-        self.H0_c.vector()[:] += 1.
-        # As DG function
-        self.H0.assign(self.H0_c)
-
-
-        print "asdf"
-        plot(self.H0, interactive = True)
-        quit()
-
-
-        ### Other input expressions
-        ########################################################################
+        # Input expressions
+        self.B_exp = B(self.L_init, degree = 1)
         self.beta2_exp = Beta2(self.L_init, degree = 1)
 
 
@@ -113,7 +82,6 @@ class CommonInputsRealistic(object):
                self.boundaries[f] = 2
 
 
-    def assign_B(self, L):
-        frac = L / self.domain_length
-        # Computes B at vertex coordinates
-        self.B.vector()[:] = np.ascontiguousarray(self.B_interp(self.mesh_coords * frac)[::-1])
+    # Return an expression for the surface mass balance
+    def adot_expression(self, S, adot):
+        return Constant(-4.) * ((S / Constant(4000.0)) - Constant(1.))**2 + adot

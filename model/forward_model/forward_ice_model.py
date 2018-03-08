@@ -216,8 +216,7 @@ class ForwardIceModel(object):
         ########################################################################
 
         # Get the time step from input file
-        dt = self.model_inputs.dt
-        self.dt.assign(dt)
+        self.dt.assign(self.model_inputs.dt)
         # Number of steps
         self.N = self.model_inputs.N
         # Iteration count
@@ -238,7 +237,6 @@ class ForwardIceModel(object):
         self.model_inputs.assign_inputs(i, L)
         self.B.assign(self.model_inputs.B)
         self.beta2.assign(self.model_inputs.beta2)
-        self.adot.assign(self.model_inputs.adot)
         self.adot_prime_func.assign(project(self.adot_prime, self.V_cg))
 
 
@@ -247,15 +245,17 @@ class ForwardIceModel(object):
             self.update_inputs(self.i, float(self.L0))
 
             try:
-                print float(self.adot0)
+                self.assigner.assign(self.U, [self.zero_guess, self.zero_guess,self.H0_c, self.H0, self.L0])
                 solver = NonlinearVariationalSolver(self.problem)
                 solver.parameters.update(self.snes_params)
                 solver.solve()
             except:
                 solver = NonlinearVariationalSolver(self.problem)
                 solver.parameters.update(self.snes_params)
-                solver.parameters['snes_solver']['error_on_nonconvergence'] = False
-                self.assigner.assign(self.U, [self.zero_guess, self.zero_guess,self.H0_c, self.H0, self.L0])
+                solver.parameters['newton_solver']['error_on_nonconvergence'] = False
+                solver.parameters['newton_solver']['relaxation_parameter'] = 0.95
+                solver.parameters['newton_solver']['report'] = True
+                #self.assigner.assign(self.U, [self.zero_guess, self.zero_guess,self.H0_c, self.H0, self.L0])
                 solver.solve()
 
             # Update previous solutions
@@ -265,8 +265,6 @@ class ForwardIceModel(object):
             # Update time
             self.t += float(self.dt)
             self.i += 1
-
-        return (self.i == self.N)
 
 
     # Write out a steady state file
