@@ -1,40 +1,45 @@
 from dolfin import *
-from common_inputs import *
 import numpy as np
+from common_inputs import *
 
 """
-Model inputs for the reverse model. This includes common inputs as well as glacier
-length L.
+Standard forward model inputs.
 """
 
 class InverseInputs(CommonInputs):
 
-    def __init__(self, input_file_name):
-        super(InverseInputs, self).__init__(input_file_name)
-        self.L = self.get_L(0.)
-        self.dLdt = self.get_dLdt(0.)
+    def __init__(self, input_file_name, adot_inputs, length_inputs, dt, N):
+
+        super(InverseInputs, self).__init__(input_file_name, adot_inputs)
+
+        # Encapsulates glacier lenth inputs (determines L and dLdt through time)
+        self.length_inputs = length_inputs
+        # Time Step
+        self.dt = dt
+        # Number of time steps to take
+        self.N = N
+        # Glacier length
+        self.L = self.L_init
+        # Rate of change of glacier length
+        self.dLdt = self.length_inputs.get_dLdt(0.0)
 
 
-    ### Return L
+    # Get glacier length at time t
     def get_L(self, t):
-        return self.L_init
-        #return self.L_init - 25.*t
+        return self.L_init + self.length_inputs.get_L_offset(t)
 
 
-    ### Return dLdt
+    # Get rate of change of glacier length
     def get_dLdt(self, t):
-        #return -25.
-        return 0.0
+        return self.length_inputs.get_dLdt(t)
 
 
-    ### Get inputs for the inverse model
-    def assign_inputs(self, t, dt):
-        # Model inputs are assigned based on current time
-        self.B_exp.L = self.get_L(t)
-        self.beta2_exp.L = self.get_L(t)
-        self.B.interpolate(self.B_exp)
-        self.beta2.interpolate(self.beta2_exp)
-
+    # Update inputs that change with length, iteration, time, and time step
+    def update_inputs(self, i, t, dt):
+        # Assign bed function
+        self.bed_inputs.update(self.get_L(t))
+        # Update adto expression
+        self.adot_inputs.update(i, t, self.get_L(t))
         # The value of L to use at this time step is the future L at t + dt
         self.L = self.get_L(t + dt)
         self.dLdt = self.get_dLdt(t + dt)

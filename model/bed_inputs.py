@@ -1,87 +1,63 @@
 from dolfin import *
 import numpy as np
+from scipy.interpolate import UnivariateSpline
 
 """
-Model inputs that are common to both models. This includes initial ice thickness
-and length, length dependent bed elevation, and beta2.
+Load and interpolate bed data.
 """
 
 class BedInputs(object):
 
-    def __init__(self, inputs):
+    def __init__(self, inputs, bed_file):
 
-        # Load the mesh for the model
-        self.data_mesh = Mesh()
-        self.input_file  = HDF5File(self.mesh.mpi_comm(), input_file_name, "r")
-        self.input_file.read(self.mesh, "/mesh", False)
-
-        # Create function space for input data
-        self.E_cg = FiniteElement("CG", self.mesh.ufl_cell(), 1)
-        self.E_dg = FiniteElement("DG", self.mesh.ufl_cell(), 0)
-        self.E_r = FiniteElement("R",  self.mesh.ufl_cell(), 0)
-        self.V_cg = FunctionSpace(self.mesh, self.E_cg)
-        self.V_dg = FunctionSpace(self.mesh, self.E_dg)
-        self.V_r = FunctionSpace(self.mesh, self.E_r)
-
-        # Bed elevation
-        class B(Expression):
-            def __init__(self, L_initial, degree=1):
-                self.L = L_initial
-                self.degree=degree
-
-            def eval(self, values, x):
-                #values[0] = 0.0
-                x = x[0] * self.L
-                values[0] = 250.*cos(2.*np.pi*x / 100000.) - 250.0
-
-        # Basal traction
-        class Beta2(Expression):
-            def __init__(self, L_initial, degree=1):
-                self.L = L_initial
-                self.degree=degree
-
-            def eval(self,values,x):
-                values[0] = 1e-3
+        # Model inputs
+        self.inputs = inputs
 
 
-        ### Functions for storing inputs
+        ### Mesh and function spaces
         ########################################################################
 
-        # Initial DG thickness
-        self.H0 = Function(self.V_dg)
-        # Initial CG thickness
-        self.H0_c = Function(self.V_cg)
-        # Bed
-        self.B = Function(self.V_cg)
-        # Basal traction
-        self.beta2 = Function(self.V_cg)
-        # Initial length
-        self.L0 = Function(self.V_r)
+        self.mesh = Mesh()
 
-        # Load initial thickness, velocity, and length from a file
-        self.input_file.read(self.H0, "/H0")
-        self.input_file.read(self.H0_c, "/H0_c")
-        self.input_file.read(self.L0, "/L0")
-        self.L_init = self.L0.vector().array()[0]
-
-        # Input expressions
-        self.B_exp = B(self.L_init, degree = 1)
-        self.beta2_exp = Beta2(self.L_init, degree = 1)
+        bed_file.read(self.mesh, "/B_mesh", False)
+        V_cg = FunctionSpace(self.mesh, 'CG', 1)
+        V_r = FunctionSpace(self.mesh, 'R', 0)
 
 
-        #### Create boundary facet function
+        ### Interpolate the bed
         ########################################################################
-        self.boundaries = FacetFunctionSizet(self.mesh, 0)
 
-        for f in facets(self.mesh):
-            if near(f.midpoint().x(), 1):
-                # Terminus
-               self.boundaries[f] = 1
-            if near(f.midpoint().x(), 0):
-               # Divide
-               self.boundaries[f] = 2
+        # Load the bed data
+        B = Function(V_cg)
+        bed_file.read(B, "B_data")
+        self.B = B
+
+        # Load the domain length
+        domain_length_func = Function(V_r)
+        bed_file.read(domain_length_func, "domain_length")
+        self.domain_length_func = domain_length_func
+        self.domain_length = float(domain_length_func)
+
+        # Get the bed mesh coordinates
+        mesh_coords = self.mesh.coordinates()[:,0]
+        # Normalize so that coordinates go from 0 to 1
+        mesh_coords /= mesh_coords.max()
+        # Interpolated bed function, needed to determine the inital thickness
+        self.B_interp = UnivariateSpline(mesh_coords, project(B).compute_vertex_values(), k = 3, s =  0.1)
+
+        #plot(self.B, interactive = True)
+        #self.B.vector()[:] = np.ascontiguousarray(self.B_interp(mesh_coords)[::-1])
+        #plot(self.B, interactive = True)
 
 
-    # Return an expression for the surface mass balance
-    def adot_expression(self, S, adot):
-        return Constant(-4.) * ((S / Constant(4000.0)) - Constant(1.))**2 + adot
+    # Set B in the model inputs object
+    def update(self, L):
+        frac = L / self.domain_length
+        # Computes B at vertex coordinates
+        self.inputs.B.vector()[:] = np.ascontiguousarray(self.B_interp(self.inputs.mesh_coords * frac)[::-1])
+
+
+    # Get bed elevation at a point
+    def get_B(self, x):
+        frac = x / self.domain_length
+        return self.B_interp(frac)

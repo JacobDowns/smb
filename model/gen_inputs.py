@@ -1,5 +1,6 @@
 from dolfin import *
 import numpy as np
+from bed_inputs import *
 
 """
 Flexible class for generating a forward model inputs file.
@@ -12,49 +13,84 @@ class GenInputs(object):
         ### Mesh and function spaces
         ########################################################################
 
-        N = inputs_dict['cell_count']
+        N = 1200
+        if 'cell_count' in inputs_dict:
+            N = inputs_dict['cell_count']
+
         mesh = IntervalMesh(N, 0., 1.)
+        self.mesh_coords = mesh.coordinates()[:,0]
 
         V_cg = FunctionSpace(mesh, 'CG', 1)
-        V_cg = FunctionSpace(mesh, 'CG', 1)
+        V_dg = FunctionSpace(mesh, 'DG', 0)
         V_r = FunctionSpace(mesh, 'R', 0)
 
 
         ### Bed data
         ########################################################################
 
-        bed_mesh = Mesh()
-        bed_file = HDF5File(bed_mesh.mpi_comm(), inputs_dict['bed_file'], "r")
-        bed_file.read(bed_mesh, "/mesh", False)
-        V_cg_bed = FunctionSpace(data_mesh, 'CG', 1)
-        V_r_bed = FunctionSpace(data_mesh, 'R', 0)
-
-        # Load the bed data
-        B = Function(V_cg_bed)
-        bed_file.read(B, "B")
-        # Load the domain length
-        domain_length_func = Function(V_r_bed)
-        input_file.read(domain_length_func, "domain_length")
-
-
-        ### Interpolate the bed
-        ########################################################################
-
-        # Get the bed mesh coordinates
-        bed_mesh_coords = bed_mesh.coordinates()[:,0]
-        # Normalize so that coordinates go from 0 to 1
-        bed_mesh_coords /= bed_mesh_coords.max()
-        # Interpolated bed function, needed (kind of) to determine the inital thickness
-        B_interp =  UnivariateSpline(bed_mesh_coords, project(B).compute_vertex_values(), k = 3, s =  1)
+        # Bed function
+        self.B = Function(V_cg)
+        # Open file with bed data
+        bed_file = HDF5File(mesh.mpi_comm(), inputs_dict['bed_file_name'], "r")
+        # Load bed data from file
+        bed_inputs = BedInputs(self, bed_file)
+        # Assign bed function
+        bed_inputs.update(inputs_dict['L_init'])
 
 
         #### Initial thickness
         ########################################################################
 
-        # Get the desired initial glacier length
-        L_init = inputs_dict['L_init']
+        # Continuous thickness
+        H0 = Function(V_cg)
+        # DG thickness
+        H0_c = Function(V_dg)
         # Get the bed elevation at the desired terminus position
-        frac = L_init / float(domain_length_func)
-        B_term = B_interp(frac)
+        B_term = bed_inputs.get_B(inputs_dict['L_init'])
 
-        quit()
+        H_max = 3000.
+        if 'H_max' in inputs_dict:
+            H_max = inputs_dict['H_max']
+
+        # Surface expression
+        class SExp(Expression):
+            def eval(self,values,x):
+                values[0] = np.sqrt((H_max + B_term)**2*(1. - x[0])) + B_term
+
+        S = project(SExp(degree = 1), V_cg)
+        # Compute initial thickness
+        H0_c.assign(project(S - self.B, V_cg))
+        # As DG function
+        H0.assign(project(H0_c, V_dg))
+
+        # Initial glacier length
+        L0 = Function(V_r)
+        L0.assign(Constant(inputs_dict['L_init']))
+
+
+        ### Write a model inputs file
+        ########################################################################
+
+        out_file = HDF5File(mesh.mpi_comm(), inputs_dict['out_file'] + '.h5', "w")
+
+        # Write the bed data
+        out_file.write(bed_inputs.mesh, "B_mesh")
+        out_file.write(bed_inputs.B, "B_data")
+        out_file.write(bed_inputs.domain_length_func, "domain_length")
+
+        # Write the model data
+        out_file.write(mesh, "mesh")
+        out_file.write(H0, "H0")
+        out_file.write(H0_c, "H0_c")
+        out_file.write(L0, "L0")
+        out_file.close()
+
+
+inputs_dict = {}
+inputs_dict['cell_count'] = 1200
+inputs_dict['bed_file_name'] = '../forward_inputs/is_mesh_new.h5'
+inputs_dict['L_init'] = 390e3
+inputs_dict['H_max'] = 2450.
+inputs_dict['out_file'] = '../forward_inputs/is_inputs_new2'
+
+gi = GenInputs(inputs_dict)

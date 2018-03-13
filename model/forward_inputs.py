@@ -1,31 +1,18 @@
 from dolfin import *
+import numpy as np
 from common_inputs import *
 
 """
-Model inputs for the reverse model. This includes common inputs as well as glacier
-length L.
+Standard forward model inputs.
 """
 
-class ForwardInputs1(CommonInputs):
+class ForwardInputs(CommonInputs):
 
-    def __init__(self, input_file_name):
+    def __init__(self, input_file_name, adot_inputs, dt, N):
 
-        super(ForwardInputs, self).__init__(input_file_name)
-        # SMB free parameter
-        self.adot = Function(self.V_r)
-        # Number of steps
-        self.N = self.input_file.attributes("adot0")['count']
-        # Time step
-        dt = Function(self.V_r)
-        self.input_file.read(dt, "dt")
-        self.dt = float(dt)
+        super(ForwardInputs, self).__init__(input_file_name, adot_inputs)
 
-
-    # Update iteration and length
-    def update(self, i, L):
-        self.input_file.read(self.adot, "adot0/vector_" + str(i))
-        self.update_L(self.L)
-
-
-    def adot_expression(self, S):
-        return super.adot_expression(S, self.adot)
+        # Time Step
+        self.dt = dt
+        # Number of time steps to take
+        self.N = N

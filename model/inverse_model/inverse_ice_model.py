@@ -146,11 +146,11 @@ class InverseIceModel(object):
         # Overburden pressure
         P_0 = Constant(self.constants['rho']*self.constants['g'])*H_c
         # Water pressure
-        P_w = Constant(self.constants['rho_w']*self.constants['g'])*B
+        P_w = Constant(0.8)*P_0
         # Effective pressure
         N = P_0 - P_w
         # Surface mass balance expression
-        self.adot_prime = model_inputs.adot_expression(S_dg, adot)
+        self.adot_prime = model_inputs.get_adot_exp(S_dg, adot)
 
 
         self.S = S
@@ -199,34 +199,53 @@ class InverseIceModel(object):
         self.snes_params = {'nonlinear_solver': 'newton',
                       'newton_solver': {
                        'relative_tolerance' : 5e-14,
-                       'absolute_tolerance' : 7e-5,
+                       'absolute_tolerance' : 8e-5,
                        'linear_solver': 'mumps',
                        'maximum_iterations': 100,
-                       'report' : True
+                       'report' : False
                        }}
 
         self.problem = problem
 
 
-        ### Output files
+        ### Start a replay file, that allows replaying the run in the forward model
         ########################################################################
         self.out_file = HDF5File(mpi_comm_world(), out_dir + '/' + replay_file + ".hdf5", 'w')
 
-        # Write mesh
+        ### Write bed data
+        self.out_file.write(self.model_inputs.B_mesh, "B_mesh")
+        self.out_file.write(self.model_inputs.B_data, "B_data")
+        self.out_file.write(self.model_inputs.domain_length, "domain_length")
+
+        ### Write variables
         self.out_file.write(self.mesh, "mesh")
-        # Write initial thickness
-        self.out_file.write(self.H0, 'H0')
-        self.out_file.write(self.H0_c, 'H0_c')
-        # Write initial length
+        self.out_file.write(self.H0, "H0")
+        self.out_file.write(self.H0_c, "H0_c")
         L0_write = Function(self.V_r)
         L0_write.assign(Constant(self.model_inputs.L_init))
-        self.out_file.write(L0_write, 'L0')
+        self.out_file.write(L0_write, "L0")
+        self.out_file.write(self.boundaries, "boundaries")
+        self.out_file.flush()
 
+
+        ### Setup some stuff for time iteration
+        ########################################################################
+
+        # Get the time step from input file
+        self.dt.assign(self.model_inputs.dt)
+        # Number of steps
+        self.steps = self.model_inputs.N
+        # Iteration count
+        self.i = 0
+        # Write the time step we used
+        dt_write = Function(self.V_r)
+        dt_write.assign(self.dt)
+        self.out_file.write(dt_write, 'dt')
 
 
     # Assign input functions from model_inputs
-    def update_inputs(self, t, dt):
-        self.model_inputs.assign_inputs(t, dt)
+    def update_inputs(self, i, t, dt):
+        self.model_inputs.update_inputs(i, t, dt)
         # Update time
         self.L.assign(self.model_inputs.L)
         self.dLdt.assign(self.model_inputs.dLdt)
@@ -235,25 +254,10 @@ class InverseIceModel(object):
 
 
     # Take N steps of size dt
-    def run(self, dt, N):
-
-        i = 0
-        self.dt.assign(dt)
-
-        # Write the time step we used
-        dt_write = Function(self.V_r)
-        dt_write.assign(self.dt)
-        self.out_file.write(dt_write, 'dt')
-
-        # List of lapse rates
-        rates = []
-        # List of lenths
-        Ls = []
-
-        while i < N:
+    def step(self):
+        if self.i < self.steps:
             # Update input functions which depend on length L
-            self.update_inputs(self.t, dt)
-
+            self.update_inputs(self.i, self.t,  float(self.dt))
 
             try:
                 solver = NonlinearVariationalSolver(self.problem)
@@ -262,28 +266,24 @@ class InverseIceModel(object):
             except:
                 solver = NonlinearVariationalSolver(self.problem)
                 solver.parameters.update(self.snes_params)
-                solver.parameters['snes_solver']['error_on_nonconvergence'] = False
-                self.assigner.assign(self.U, [self.zero_guess, self.zero_guess,self.H0_c, self.H0, self.adot0])
+                solver.parameters['newton_solver']['error_on_nonconvergence'] = False
+                solver.parameters['newton_solver']['relaxation_parameter'] = 0.9
+                solver.parameters['newton_solver']['report'] = True
+                #self.assigner.assign(self.U, [self.zero_guess, self.zero_guess,self.H0_c, self.H0, self.adot0])
                 solver.solve()
 
             # Update previous solutions
             self.assigner_inv.assign([self.un, self.u2n, self.H0_c, self.H0, self.adot0], self.U)
             # Print current time, max thickness, and adot parameter
-            print self.t, self.H0.vector().max(), float(self.adot0)
+            print self.t, self.H0.vector().max(), self.H0.vector().min(), float(self.adot0), float(self.dLdt)
             # Write inputs for this time
             self.checkpoint()
             self.adot_prime_func.assign(project(self.adot_prime, self.V_cg))
             plot(self.adot_prime_func, interactive = False)
-            rates.append(float(self.adot0))
-            Ls.append(float(self.L))
 
             # Update time
-            self.t += dt
-
-            i += 1
-
-        return rates, Ls
-        #self.out_file.close()
+            self.t += float(self.dt)
+            self.i += 1
 
 
     # Reset the model so we can re-run the simulation
@@ -304,13 +304,20 @@ class InverseIceModel(object):
 
     # Write out a steady state file
     def write_steady_file(self, output_file_name):
-      output_file = HDF5File(mpi_comm_world(), output_file_name + '.hdf5', 'w')
+        output_file = HDF5File(mpi_comm_world(), output_file_name + '.hdf5', 'w')
 
-      ### Write variables
-      output_file.write(self.mesh, "mesh")
-      output_file.write(self.H0, "H0")
-      output_file.write(self.H0_c, "H0_c")
-      output_file.write(project(self.L, self.V_r), "L0")
-      output_file.write(self.boundaries, "boundaries")
-      output_file.flush()
-      output_file.close()
+        ### Write bed data
+        output_file.write(self.model_inputs.B_mesh, "B_mesh")
+        output_file.write(self.model_inputs.B_data, "B_data")
+        output_file.write(self.model_inputs.domain_length, "domain_length")
+
+        ### Write variables
+        output_file.write(self.mesh, "mesh")
+        output_file.write(self.H0, "H0")
+        output_file.write(self.H0_c, "H0_c")
+        L0_write = Function(self.V_r)
+        L0_write.assign(self.L)
+        output_file.write(L0_write, "L0")
+        output_file.write(self.boundaries, "boundaries")
+        output_file.flush()
+        output_file.close()

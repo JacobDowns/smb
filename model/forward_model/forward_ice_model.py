@@ -33,7 +33,7 @@ class ForwardIceModel(object):
 
         E_cg = self.model_inputs.E_cg
         E_dg = self.model_inputs.E_dg
-        E_r = FiniteElement("R", self.mesh.ufl_cell(), 0)
+        E_r =  self.model_inputs.E_r
         E_V = MixedElement(E_cg, E_cg, E_cg, E_dg, E_r)
 
         V_cg = self.model_inputs.V_cg
@@ -140,11 +140,12 @@ class ForwardIceModel(object):
         # Overburden pressure
         P_0 = Constant(self.constants['rho']*self.constants['g'])*H_c
         # Water pressure
-        P_w = Constant(self.constants['rho_w']*self.constants['g'])*B
+        #P_w = Constant(self.constants['rho_w']*self.constants['g'])*B
+        P_w = Constant(0.8)*P_0
         # Effective pressure
         N = P_0 - P_w
         # SMB expression
-        self.adot_prime = model_inputs.adot_expression(S_dg)
+        self.adot_prime = model_inputs.get_adot_exp(S_dg)
         # SMB as a function
         self.adot_prime_func = Function(self.V_cg)
 
@@ -218,7 +219,7 @@ class ForwardIceModel(object):
         # Get the time step from input file
         self.dt.assign(self.model_inputs.dt)
         # Number of steps
-        self.N = self.model_inputs.N
+        self.steps = self.model_inputs.N
         # Iteration count
         self.i = 0
 
@@ -233,16 +234,17 @@ class ForwardIceModel(object):
 
 
     # Assign input functions from model_inputs
-    def update_inputs(self, i, L):
-        self.model_inputs.assign_inputs(i, L)
+    def update_inputs(self, i, t, L, dt):
+        print i, t, L
+        self.model_inputs.update_inputs(i, t, L, dt)
         self.B.assign(self.model_inputs.B)
         self.beta2.assign(self.model_inputs.beta2)
         self.adot_prime_func.assign(project(self.adot_prime, self.V_cg))
 
 
     def step(self):
-        if self.i < self.N:
-            self.update_inputs(self.i, float(self.L0))
+        if self.i < self.steps:
+            self.update_inputs(self.i, self.t, float(self.L0), float(self.dt))
 
             try:
                 self.assigner.assign(self.U, [self.zero_guess, self.zero_guess,self.H0_c, self.H0, self.L0])
@@ -253,7 +255,7 @@ class ForwardIceModel(object):
                 solver = NonlinearVariationalSolver(self.problem)
                 solver.parameters.update(self.snes_params)
                 solver.parameters['newton_solver']['error_on_nonconvergence'] = False
-                solver.parameters['newton_solver']['relaxation_parameter'] = 0.95
+                solver.parameters['newton_solver']['relaxation_parameter'] = 0.9
                 solver.parameters['newton_solver']['report'] = True
                 #self.assigner.assign(self.U, [self.zero_guess, self.zero_guess,self.H0_c, self.H0, self.L0])
                 solver.solve()
@@ -271,13 +273,16 @@ class ForwardIceModel(object):
     def write_steady_file(self, output_file_name):
       output_file = HDF5File(mpi_comm_world(), output_file_name + '.hdf5', 'w')
 
+      ### Write bed data
+      output_file.write(self.model_inputs.B_mesh, "B_mesh")
+      output_file.write(self.model_inputs.B_data, "B_data")
+      output_file.write(self.model_inputs.domain_length, "domain_length")
+
       ### Write variables
       output_file.write(self.mesh, "mesh")
       output_file.write(self.H0, "H0")
       output_file.write(self.H0_c, "H0_c")
       output_file.write(self.L0, "L0")
-      output_file.write(self.un, "u0")
-      output_file.write(self.u2n, "u20")
       output_file.write(self.boundaries, "boundaries")
       output_file.flush()
       output_file.close()
