@@ -1,17 +1,16 @@
-from model.inverse_inputs import *
-from model.length_inputs_linear import *
+from model.forward_inputs_replay import *
 from model.adot_inputs_elevation_dependent import *
-from model.inverse_model.inverse_ice_model import *
+from model.forward_model.forward_ice_model import *
 
 """
 Force the ice sheet to retreat at a constant rate of speed.
 """
 
 adot_inputs = AdotInputsElevationDependent()
-length_inputs = LengthInputsLinear(-25.)
-
-inputs = InverseInputs('is_steady_elevation_dependent.hdf5', adot_inputs, length_inputs, dt = 1., N = 6000)
-model = InverseIceModel(inputs, "out", "is_replay_steady_elevation_dependent")
+inputs = ForwardInputsReplay('out/replay/is_replay_retreat.hdf5', adot_inputs)
+model = ForwardIceModel(inputs, "out", "forward_replay")
+# Do this once, just so we can get the bed data
+inputs.update_inputs(0, 0., inputs.L_init, 1.)
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -22,40 +21,37 @@ plt.rcParams.update({'font.size': 22})
 
 plt.ion()
 fig,ax = plt.subplots(nrows=2,sharex=True,figsize=(7,7))
-xs = forward_inputs.mesh.coordinates() * forward_inputs.L_init
-xs_full = np.linspace(0., forward_inputs.L_init, 100)
+xs = inputs.mesh.coordinates() * inputs.L_init
 
-L_init = forward_inputs.L_init
+L_init = inputs.L_init
 
+bed = project(model.B)
 surface = project(model.S)
 adot = project(model.adot_prime_func)
+bed = project(inputs.B)
 
-ph_bed, = ax[0].plot(xs_full, 250.*np.cos(2.*np.pi*xs_full / 100000.) - 250.0, 'b', linewidth = 2.5)
+ph_bed, = ax[0].plot(xs, bed.compute_vertex_values(), 'b', linewidth = 2.5)
 ph_surface, = ax[0].plot(xs, surface.compute_vertex_values(), 'k', linewidth = 2.5)
-ph_term, = ax[0].plot([forward_inputs.L_init, forward_inputs.L_init], [-100., 4000.], 'r--', linewidth = 2.5)
-ax[0].set_ylim(-550, 4000)
-ax[0].set_xlim(0, forward_inputs.L_init)
+ph_term, = ax[0].plot([inputs.L_init, inputs.L_init], [-500., 4000.], 'r--', linewidth = 2.5)
+ax[0].set_ylim(-400, 3500.)
+ax[0].set_xlim(0, inputs.L_init)
 ax[0].set_ylabel('H (m)')
 
 ph_adot, = ax[1].plot(xs, adot.compute_vertex_values(), 'k', linewidth = 2.5)
-ax[1].plot(xs_full, 0.0 * xs_full, 'b', linewidth = 2.5)
+ax[1].plot(xs, 0.*xs, 'b', linewidth = 2.5)
 ax[1].set_ylim(-2.5, 1.5)
-ax[1].set_xlim(0, forward_inputs.L_init)
+ax[1].set_xlim(0, inputs.L_init)
 ax[1].set_xlabel('x (km)')
 ax[1].set_ylabel('smb (m/a)')
 
 plt.pause(0.00000001)
-
-
-
-print model.N
 
 while model.i < model.steps:
     print model.i
     model.step()
 
     if model.i % 10 == 0:
-        xs = forward_inputs.mesh.coordinates() * float(model.L0)
+        xs = inputs.mesh.coordinates() * float(model.L0)
 
         # Plot thickness
         surface = project(model.S)

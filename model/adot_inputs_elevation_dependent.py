@@ -12,5 +12,5 @@ class AdotInputsElevationDependent(object):
         return Constant(-3.) * ((S / Constant(3500.0)) - Constant(1.))**2 + adot_param
 
     # Update the smb expression
-    def update(self, i, t, L):
+    def update(self, t, L):
         pass

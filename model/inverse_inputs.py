@@ -3,7 +3,7 @@ import numpy as np
 from common_inputs import *
 
 """
-Standard forward model inputs.
+Inverse model inputs, which includes the glacier length through time.
 """
 
 class InverseInputs(CommonInputs):
@@ -39,7 +39,7 @@ class InverseInputs(CommonInputs):
         # Assign bed function
         self.bed_inputs.update(self.get_L(t))
         # Update adto expression
-        self.adot_inputs.update(i, t, self.get_L(t))
+        self.adot_inputs.update(t, self.get_L(t))
         # The value of L to use at this time step is the future L at t + dt
         self.L = self.get_L(t + dt)
         self.dLdt = self.get_dLdt(t + dt)

@@ -268,6 +268,8 @@ class ForwardIceModel(object):
             self.t += float(self.dt)
             self.i += 1
 
+            return float(self.L0)
+
 
     # Write out a steady state file
     def write_steady_file(self, output_file_name):

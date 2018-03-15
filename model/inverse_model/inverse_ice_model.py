@@ -252,6 +252,13 @@ class InverseIceModel(object):
         self.B.assign(self.model_inputs.B)
         self.beta2.assign(self.model_inputs.beta2)
 
+        if i == 0:
+            print i, t, dt
+            #plot(self.B, interactive = True)
+            #plot(self.beta2, interactive = True)
+            print float(self.L)
+            print float(self.dLdt)
+
 
     # Take N steps of size dt
     def step(self):
@@ -277,21 +284,28 @@ class InverseIceModel(object):
             # Print current time, max thickness, and adot parameter
             print self.t, self.H0.vector().max(), self.H0.vector().min(), float(self.adot0), float(self.dLdt)
             # Write inputs for this time
-            self.checkpoint()
+            #self.checkpoint()
             self.adot_prime_func.assign(project(self.adot_prime, self.V_cg))
-            plot(self.adot_prime_func, interactive = False)
+            #plot(self.adot_prime_func, interactive = False)
 
             # Update time
             self.t += float(self.dt)
             self.i += 1
 
+            return float(self.adot0)
+
 
     # Reset the model so we can re-run the simulation
     def reset(self):
+
+        print "reset"
         self.t = 0.0
+        self.i = 0
         self.H0.assign(self.model_inputs.H0)
         self.H0_c.assign(self.model_inputs.H0_c)
         self.adot0.assign(Constant(2.))
+        self.un.assign(self.zero_guess)
+        self.u2n.assign(self.zero_guess)
 
 
     # Write inputs for forward model

@@ -28,5 +28,5 @@ class AdotInputsLinear(object):
 
 
     # Update the smb expression
-    def update(self, i, t, L):
+    def update(self, t, L):
         self.adot_exp.L = L

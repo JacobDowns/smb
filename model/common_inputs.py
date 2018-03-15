@@ -15,6 +15,7 @@ class CommonInputs(object):
 
         self.mesh = Mesh()
         input_file = HDF5File(self.mesh.mpi_comm(), input_file_name, "r")
+        self.input_file = input_file
         input_file.read(self.mesh, "/mesh", False)
         self.mesh_coords = self.mesh.coordinates()[:,0]
 
