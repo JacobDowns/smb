@@ -26,7 +26,7 @@ class SmoothReplay(ForwardInputsReplay):
 
         adot_params = savgol_filter(adot_params, window, degree)
 
-
+        
         ### Write a new replay file
         ########################################################################
         output_file = HDF5File(mpi_comm_world(), output_file_name + '.hdf5', 'w')
@@ -49,6 +49,7 @@ class SmoothReplay(ForwardInputsReplay):
         output_file.write(dt_write, 'dt')
 
         ### SMB parameter
+
         for i in range(self.N):
             t = i*self.dt
             self.adot_param.assign(Constant(adot_params[i]))

@@ -9,7 +9,7 @@ Force the ice sheet to retreat at a constant rate of speed.
 """
 
 adot_inputs = AdotInputsElevationDependent()
-inputs = ForwardInputsReplay('out/replay/is_replay_retreat_smooth3.hdf5', adot_inputs)
+inputs = ForwardInputsReplay('out/replay/is_replay_retreat_smooth_3001.hdf5', adot_inputs)
 model = ForwardIceModel(inputs, "out", "forward_replay")
 # Do this once, just so we can get the bed data
 inputs.update_inputs(0, 0., inputs.L_init, 1.)
