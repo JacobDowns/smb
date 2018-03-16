@@ -28,7 +28,6 @@ inputs = InverseInputs('is_steady_elevation_dependent.hdf5', adot_inputs, length
 model = InverseIceModel(inputs, "out", "is_replay_steady_elevation_dependent")
 
 
-
 ### Objective function
 ################################################################################
 

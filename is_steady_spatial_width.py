@@ -5,9 +5,7 @@ from model.forward_model.forward_ice_model import *
 adot_inputs = AdotInputsLinear(adot_max = 0.5, L_steady = 425e3)
 #inputs = ForwardInputs('forward_inputs/is_inputs_new2.h5', adot_inputs, dt = 7.5, N = 4000)
 inputs = ForwardInputs('forward_inputs/is_inputs_width.h5', adot_inputs, dt = 7.5, N = 4000)
-#model = ForwardIceModel(inputs, "out", "is_steady")
-
-quit()
+model = ForwardIceModel(inputs, "out", "is_steady_spatial_width")
 
 S_func = Function(model.V_cg)
 

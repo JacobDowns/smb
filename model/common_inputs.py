@@ -32,6 +32,10 @@ class CommonInputs(object):
 
         # Bed function
         self.B = Function(self.V_cg)
+        # Width
+        self.width = Function(self.V_cg)
+        # Spatial derivative of width
+        self.width_dx = Function(self.V_cg)
         # Load bed data from the input file
         self.bed_inputs = BedInputs(self, input_file)
         # Store the bed mesh and data
@@ -78,7 +82,7 @@ class CommonInputs(object):
         # Assign bed function
         self.bed_inputs.update(L)
         # Update adto expression
-        self.adot_inputs.update(i, t, L)
+        self.adot_inputs.update(t, L)
 
 
     # Return the smb expression, just ignore the surface

@@ -42,12 +42,22 @@ class BedInputs(object):
         mesh_coords = self.mesh.coordinates()[:,0]
         # Normalize so that coordinates go from 0 to 1
         mesh_coords /= mesh_coords.max()
-        # Interpolated bed function, needed to determine the inital thickness
+        # Interpolated bed function
         self.B_interp = UnivariateSpline(mesh_coords, project(B).compute_vertex_values(), k = 3, s =  0.1)
 
-        #plot(self.B, interactive = True)
-        #self.B.vector()[:] = np.ascontiguousarray(self.B_interp(mesh_coords)[::-1])
-        #plot(self.B, interactive = True)
+
+        ### Interpolate the width
+        ########################################################################
+
+        # Load width data
+        width = Function(V_cg)
+        bed_file.read(width, "width_data")
+        self.width = width
+
+        # Interpolated width function
+        self.width_interp = UnivariateSpline(mesh_coords, project(width).compute_vertex_values(), k = 3, s =  100)
+        # Spatial derivative of width
+        self.width_dx_interp = self.width_interp.derivative()
 
 
     # Set B in the model inputs object
@@ -55,6 +65,10 @@ class BedInputs(object):
         frac = L / self.domain_length
         # Computes B at vertex coordinates
         self.inputs.B.vector()[:] = np.ascontiguousarray(self.B_interp(self.inputs.mesh_coords * frac)[::-1])
+        # Computes width at vertex coordinates
+        self.inputs.width.vector()[:] = np.ascontiguousarray(self.width_interp(self.inputs.mesh_coords * frac)[::-1])
+        # Computes derative of width at vertex coordinates
+        self.inputs.width_dx.vector()[:] = np.ascontiguousarray(self.width_dx_interp(self.inputs.mesh_coords * frac)[::-1])
 
 
     # Get bed elevation at a point

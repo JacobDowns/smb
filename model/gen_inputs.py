@@ -30,6 +30,8 @@ class GenInputs(object):
 
         # Bed function
         self.B = Function(V_cg)
+        # Width
+        self.width = Function(V_cg)
         # Open file with bed data
         bed_file = HDF5File(mesh.mpi_comm(), inputs_dict['bed_file_name'], "r")
         # Load bed data from file
@@ -76,6 +78,7 @@ class GenInputs(object):
         # Write the bed data
         out_file.write(bed_inputs.mesh, "B_mesh")
         out_file.write(bed_inputs.B, "B_data")
+        out_file.write(bed_inputs.width, "width_data")
         out_file.write(bed_inputs.domain_length_func, "domain_length")
 
         # Write the model data
@@ -91,6 +94,6 @@ inputs_dict['cell_count'] = 1200
 inputs_dict['bed_file_name'] = '../forward_inputs/is_mesh_new.h5'
 inputs_dict['L_init'] = 390e3
 inputs_dict['H_max'] = 2450.
-inputs_dict['out_file'] = '../forward_inputs/is_inputs_new2'
+inputs_dict['out_file'] = '../forward_inputs/is_inputs_width'
 
 gi = GenInputs(inputs_dict)

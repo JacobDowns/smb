@@ -106,10 +106,16 @@ class ForwardIceModel(object):
         beta2 = Function(V_cg)
         # SMB
         adot = Function(V_cg)
+        # Ice stream width
+        width = Function(V_cg)
+        # Spatial derivative of width (not in transformed coords)
+        width_dx = Function(V_cg)
 
         self.B = B
         self.beta2 = beta2
         self.adot = adot
+        self.width = width
+        self.width_dx = width_dx
         # Facet function marking divide and margin boundaries
         self.boundaries = model_inputs.boundaries
 
@@ -240,11 +246,16 @@ class ForwardIceModel(object):
         self.B.assign(self.model_inputs.B)
         self.beta2.assign(self.model_inputs.beta2)
         self.adot_prime_func.assign(project(self.adot_prime, self.V_cg))
+        self.width.assign(self.model_inputs.width)
+        self.width_dx.assign(self.model_inputs.width_dx)
 
 
     def step(self):
         if self.i < self.steps:
             self.update_inputs(self.i, self.t, float(self.L0), float(self.dt))
+            plot(self.width, interactive = True)
+            plot(self.width_dx, interactive = True)
+            quit()
 
             try:
                 self.assigner.assign(self.U, [self.zero_guess, self.zero_guess,self.H0_c, self.H0, self.L0])
