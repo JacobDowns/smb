@@ -41,6 +41,9 @@ class CommonInputs(object):
         # Store the bed mesh and data
         self.B_mesh = self.bed_inputs.mesh
         self.B_data = self.bed_inputs.B
+        # Store the width data
+        self.width_data = self.bed_inputs.width
+        # Store the domain length
         self.domain_length = self.bed_inputs.domain_length_func
 
         # DG thickness

@@ -253,9 +253,9 @@ class ForwardIceModel(object):
     def step(self):
         if self.i < self.steps:
             self.update_inputs(self.i, self.t, float(self.L0), float(self.dt))
-            plot(self.width, interactive = True)
-            plot(self.width_dx, interactive = True)
-            quit()
+
+            #plot(self.width, interactive = True)
+            #plot(self.width_dx, interactive = True)
 
             try:
                 self.assigner.assign(self.U, [self.zero_guess, self.zero_guess,self.H0_c, self.H0, self.L0])
@@ -289,6 +289,7 @@ class ForwardIceModel(object):
       ### Write bed data
       output_file.write(self.model_inputs.B_mesh, "B_mesh")
       output_file.write(self.model_inputs.B_data, "B_data")
+      output_file.write(self.model_inputs.width_data, "width_data")
       output_file.write(self.model_inputs.domain_length, "domain_length")
 
       ### Write variables

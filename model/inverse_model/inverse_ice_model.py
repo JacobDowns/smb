@@ -112,11 +112,17 @@ class InverseIceModel(object):
         L = Constant(0.0)
         # Rate of change of length
         dLdt = Constant(0.0)
+        # Ice stream width
+        width = Function(V_cg)
+        # Spatial derivative of width (not in transformed coords)
+        width_dx = Function(V_cg)
 
         self.B = B
         self.beta2 = beta2
         self.L = L
         self.dLdt = dLdt
+        self.width = width
+        self.width_dx = width_dx
         # Facet function marking divide and margin boundaries
         self.boundaries = model_inputs.boundaries
 
@@ -251,13 +257,8 @@ class InverseIceModel(object):
         self.dLdt.assign(self.model_inputs.dLdt)
         self.B.assign(self.model_inputs.B)
         self.beta2.assign(self.model_inputs.beta2)
-
-        if i == 0:
-            print i, t, dt
-            #plot(self.B, interactive = True)
-            #plot(self.beta2, interactive = True)
-            print float(self.L)
-            print float(self.dLdt)
+        self.width.assign(self.model_inputs.width)
+        self.width_dx.assign(self.model_inputs.width_dx)
 
 
     # Take N steps of size dt
@@ -292,7 +293,7 @@ class InverseIceModel(object):
             self.t += float(self.dt)
             self.i += 1
 
-            return float(self.adot0)
+            return float(self.adot0), float(self.L)
 
 
     # Reset the model so we can re-run the simulation
