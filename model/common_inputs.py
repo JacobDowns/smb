@@ -34,8 +34,6 @@ class CommonInputs(object):
         self.B = Function(self.V_cg)
         # Width
         self.width = Function(self.V_cg)
-        # Spatial derivative of width
-        self.width_dx = Function(self.V_cg)
         # Load bed data from the input file
         self.bed_inputs = BedInputs(self, input_file)
         # Store the bed mesh and data

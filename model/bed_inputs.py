@@ -55,10 +55,7 @@ class BedInputs(object):
         self.width = width
 
         # Interpolated width function
-        print mesh_coords
         self.width_interp = UnivariateSpline(mesh_coords, project(width).compute_vertex_values(), k = 3, s =  100)
-        # Spatial derivative of width (Needs to be adjusted by dividing by domain length)
-        self.width_dx_interp = self.width_interp.derivative()
 
 
     # Set B in the model inputs object
@@ -68,8 +65,6 @@ class BedInputs(object):
         self.inputs.B.vector()[:] = np.ascontiguousarray(self.B_interp(self.inputs.mesh_coords * frac)[::-1])
         # Computes width at vertex coordinates
         self.inputs.width.vector()[:] = np.ascontiguousarray(self.width_interp(self.inputs.mesh_coords * frac)[::-1])
-        # Computes derative of width at vertex coordinates
-        self.inputs.width_dx.vector()[:] = np.ascontiguousarray(self.width_dx_interp(self.inputs.mesh_coords * frac)[::-1] / self.domain_length)
 
 
     # Get bed elevation at a point

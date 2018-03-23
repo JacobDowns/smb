@@ -13,25 +13,46 @@ fig.set_size_inches(0.5*11., 0.5*5.2)
 
 ts = np.linspace(0., float(years), years)
 
+
 """
+for i in range(num_samples):
+    print i
+    try :
+        rates = np.loadtxt('sample_rates/' + str(i) + '.txt')
+        lengths = np.loadtxt('sample_lengths/' + str(i) + '.txt')
+        plt.plot(lengths)
+    except:
+        pass
+
+plt.show()
+quit()
+
+
+
+
 rate_mat = np.zeros((num_samples, years))
 length_mat = np.zeros((num_samples, years))
 
+j = 0
 
 for i in range(num_samples):
-    print i
-    rates = np.loadtxt('sample_rates/' + str(i) + '.txt')
-    lengths = np.loadtxt('sample_lengths/' + str(i) + '.txt')
-    # Save the lapse rate in units of cm / (km a)
-    rate_mat[i, :] = ((rates / lengths) * 1000.)
-    length_mat[i, :] = lengths
 
-np.savetxt('sample_rates/rates.txt', rate_mat)
-np.savetxt('sample_lengths/lengths.txt', length_mat)
+    try :
+        print i
+        rates = np.loadtxt('sample_rates/' + str(i) + '.txt')
+        lengths = np.loadtxt('sample_lengths/' + str(i) + '.txt')
 
-print rate_mat
-print
-print length_mat
+        # Save the lapse rate in units of cm / (km a)
+        rate_mat[j, :] = ((rates / lengths) * 1000.)
+        length_mat[j, :] = lengths
+        j += 1
+    except :
+        pass
+
+print rate_mat[0:j,:]
+
+np.savetxt('sample_rates/rates.txt', rate_mat[0:j, :])
+np.savetxt('sample_lengths/lengths.txt', length_mat[0:j, :])
 
 quit()"""
 
@@ -55,6 +76,9 @@ r_l = np.zeros(years)
 r_u = np.zeros(years)
 r_mean = np.zeros(years)
 
+num_samples = rate_mat.shape[0]
+
+
 for i in range(years):
     print i
 
@@ -66,6 +90,8 @@ for i in range(years):
     r_l[i] = conf_int[0]
     r_u[i] = conf_int[1]
 
+    print conf_int, rv.median()
+
 # scipy.stats.rv_discrete has methods for median, confidence interval, etc.
 #print("median:", rv.median())
 #print("68% CI:", rv.interval(0.68))
@@ -73,17 +99,30 @@ for i in range(years):
 #print r_l
 #print r_u
 
-ax.set_title(r'Lapse rate $r$ for $\dot{a} = 1-rx$')
+#ax.set_title(r'$r$')
 ax.set_xlabel('Time (years)')
-ax.set_ylabel(r'Lapse rate ($\frac{m a^{-1} }{km}$)')
+ax.set_ylabel('p')
 
 ax.plot(ts, r_l, 'b', lw = 2.75)
 ax.plot(ts, r_u, 'b', lw = 2.75)
 ax.plot(ts, r_mean, 'k', lw = 2.75)
+ax.plot(ts, rate_mat[0,:], 'r', lw = 2.75)
+ax.set_xticks(np.linspace(0., 6000., 13))
+ax.grid(linewidth=1)
+
+
+
+#array([    0.,  1500.,  3000.,  4500.,  6000.])
+
+
+
 fig.show()
+
+
 #np.histogram([1, 2, 1], bins=[0, 1, 2, 3])
 
 fig.savefig('rate.png', dpi = 300)
+
 
 """
 #print r_mean

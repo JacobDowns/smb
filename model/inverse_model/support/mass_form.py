@@ -26,8 +26,6 @@ class MassForm(object):
         adot_prime = model.adot_prime
         # Ice stream width
         width = model.width
-        # Spatial derivative of x in untransformed coordinates
-        width_dx = model.width_dx
         # Spatial coordinate
         x_spatial = SpatialCoordinate(model.mesh)
         # Grid velocity

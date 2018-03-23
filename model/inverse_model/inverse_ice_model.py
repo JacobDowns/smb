@@ -114,15 +114,12 @@ class InverseIceModel(object):
         dLdt = Constant(0.0)
         # Ice stream width
         width = Function(V_cg)
-        # Spatial derivative of width (not in transformed coords)
-        width_dx = Function(V_cg)
 
         self.B = B
         self.beta2 = beta2
         self.L = L
         self.dLdt = dLdt
         self.width = width
-        self.width_dx = width_dx
         # Facet function marking divide and margin boundaries
         self.boundaries = model_inputs.boundaries
 
@@ -258,7 +255,6 @@ class InverseIceModel(object):
         self.B.assign(self.model_inputs.B)
         self.beta2.assign(self.model_inputs.beta2)
         self.width.assign(self.model_inputs.width)
-        self.width_dx.assign(self.model_inputs.width_dx)
 
 
     # Take N steps of size dt
@@ -266,6 +262,9 @@ class InverseIceModel(object):
         if self.i < self.steps:
             # Update input functions which depend on length L
             self.update_inputs(self.i, self.t,  float(self.dt))
+
+            print self.i, self.t, float(self.L), float(self.adot0)
+            #plot(self.H0_c, interactive = True)
 
             try:
                 solver = NonlinearVariationalSolver(self.problem)
@@ -307,6 +306,7 @@ class InverseIceModel(object):
         self.adot0.assign(Constant(2.))
         self.un.assign(self.zero_guess)
         self.u2n.assign(self.zero_guess)
+        self.assigner.assign(self.U, [self.un, self.u2n, self.H0_c, self.H0, self.adot0])
 
 
     # Write inputs for forward model
@@ -324,6 +324,7 @@ class InverseIceModel(object):
         ### Write bed data
         output_file.write(self.model_inputs.B_mesh, "B_mesh")
         output_file.write(self.model_inputs.B_data, "B_data")
+        output_file.write(self.model_inputs.width_data, "width_data")
         output_file.write(self.model_inputs.domain_length, "domain_length")
 
         ### Write variables

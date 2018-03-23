@@ -4,6 +4,7 @@ from model.adot_inputs_elevation_dependent import *
 from model.inverse_model.inverse_ice_model import *
 import matplotlib.pyplot as plt
 import sys
+import numpy as np
 
 """
 Introduce noise to the length inputs by drawing from a GMRF.
@@ -11,9 +12,10 @@ Introduce noise to the length inputs by drawing from a GMRF.
 
 
 # Integer index
-#index = int(sys.argv[1])
-#print "index", index
-index = 0
+index = int(sys.argv[1])
+print "index", index
+#index = 0
+N = 25
 
 
 ### Noise parameters
@@ -36,105 +38,56 @@ length_inputs = LengthInputsInterp(ts, offsets)
 
 ### Setup the model
 adot_inputs = AdotInputsElevationDependent()
-inputs = InverseInputs('is_steady_elevation_dependent_width.hdf5', adot_inputs, length_inputs, dt = 1., N = 1000)
-model = InverseIceModel(inputs, "out", "is_thing")
+inputs = InverseInputs('is_steady_elevation_dependent_width.hdf5', adot_inputs, length_inputs, dt = 1., N = 6000)
+model = InverseIceModel(inputs, 'sample_output/' + str(index), 'replay_is_rand_' + str(index))
 
 
 ### Create the inverse covariance matrix Q
 ################################################################################
 Q = np.diag(2.*np.ones(num_int_points), 0) + np.diag(-np.ones(num_int_points - 1), -1) + np.diag(-np.ones(num_int_points - 1), 1)
-delta = 0.00075
+delta = 0.005
 h = ts[1]
 Q = delta * (1. / h**2) * Q
 
-for i in range(50):
 
-    noise = np.random.multivariate_normal(np.zeros(num_int_points), np.linalg.inv(Q), num_obs_points - 1).flatten()
-    random_offsets = np.zeros(len(offsets))
-    random_offsets[:] = offsets
-    random_offsets[sample_indexes == 1.] += noise
+### Run the model several time, adding random noise to the length
+################################################################################
 
-    length_inputs.set(ts, random_offsets)
+for i in range(N):
+    try :
+        ### Add noise to the length offset
+        noise = np.random.multivariate_normal(np.zeros(num_int_points), np.linalg.inv(Q), num_obs_points - 1).flatten()
+        random_offsets = np.zeros(len(offsets))
+        random_offsets[:] = offsets
+        random_offsets[sample_indexes == 1.] += noise
+        length_inputs.set(ts, random_offsets)
 
-    """
-    ts1 = np.linspace(0., 6000., 500)
-    plt.plot(ts1, np.array(map(length_inputs.get_L_offset, ts1)))"""
+        ts1 = np.linspace(0., 6000., 500)
+        plt.plot(ts1, np.array(map(length_inputs.get_L_offset, ts1)))
+        #plt.show()
 
+        # Reset the model (start back from time 0)
+        model.reset()
+        # Stores value of smb param through time
+        adot_params = []
+        # Lengths
+        lengths = []
 
-    # Reset the model (start back from time 0)
-    model.reset()
-    # Stores value of smb param through time
-    adot_params = []
-    # Lengths
-    lengths = []
+        while model.i < model.steps:
+            adot0, L = model.step()
+            #plot(model.width, interactive = False)
+            #plot(model.adot_prime_func, interactive = False)
+            #plot(model.B, interactive = False)
+            adot_params.append(adot0)
+            lengths.append(L)
 
-    while model.i < model.steps:
-        adot0, L = model.step()
-        adot_params.append(adot0)
-        lengths.append(L)
+        adot_params = np.array(adot_params)
+        lengths = np.array(lengths)
 
-    adot_params = np.array(adot_params)
-    lengths = np.array(lengths)
+        np.savetxt('sample_rates/' + str(index*N + i) + '.txt', adot_params)
+        np.savetxt('sample_lengths/' + str(index*N + i) + '.txt', lengths)
 
-    #print noise
-    #plt.plot(ts, random_offsets)
+    except:
+        print "Failed"
 
 plt.show()
-
-quit()
-
-
-### Setup the inverse model
-################################################################################
-
-adot_inputs = AdotInputsElevationDependent()
-length_inputs = LengthInputsInterp(ts, offsets)
-
-inputs = InverseInputs('is_steady_elevation_dependent.hdf5', adot_inputs, length_inputs, dt = 1., N = 100)
-model = InverseIceModel(inputs, "out", "is_thing")
-
-
-
-
-
-### Objective function
-################################################################################
-
-def run_inverse():
-
-    ### Randomize the glacier length inputs to the inverse model
-
-
-
-    plt.plot(ts1, things)
-    plt.plot(ts, offsets, 'ko')
-    plt.show()
-
-    # Reset the model (start back from time 0)
-    model.reset()
-    # Stores value of smb param through time
-    adot_params = []
-
-    while model.i < model.steps:
-        adot0 = model.step()
-        adot_params.append(adot0)
-
-    adot_params = np.array(adot_params)
-    #plt.plot(adot_params)
-    #plt.show()
-
-    #return ((adot_params[1:] - adot_params[:1])**2).sum()
-    return adot_params
-
-p1 = F(x0)
-p2 = F(x0)
-
-print p1
-print p2
-
-"""
-l_bound = list(x0 - 2000.)
-u_bound = list(x0 + 2000.)
-bounds = tuple(zip(l_bound, u_bound))
-
-res = minimize(F, x0, method='SLSQP', bounds=bounds, tol = 1e-3)"""
