@@ -162,6 +162,16 @@ class ForwardIceModel(object):
         self.N = N
 
 
+        ### Temporary variables that store variable values before a step is accepted
+        ########################################################################
+
+        self.un_temp = Function(V_cg)
+        self.u2n_temp = Function(V_cg)
+        self.H0_c_temp = Function(V_cg)
+        self.H0_temp = Function(V_dg)
+        self.L0_temp = Function(V_r)
+
+
         ### Variational Forms
         ########################################################################
 
@@ -219,10 +229,6 @@ class ForwardIceModel(object):
         ### Setup the iterator for replaying a run
         ########################################################################
 
-        # Get the time step from input file
-        self.dt.assign(self.model_inputs.dt)
-        # Number of steps
-        self.steps = self.model_inputs.N
         # Iteration count
         self.i = 0
 
@@ -237,44 +243,48 @@ class ForwardIceModel(object):
 
 
     # Assign input functions from model_inputs
-    def update_inputs(self, i, t, L, dt):
-        print i, t, L
-        self.model_inputs.update_inputs(i, t, L, dt)
+    def update_inputs(self, i, t, L, dt, adot0):
+        self.model_inputs.update_inputs(i, t, L, dt, adot0)
         self.B.assign(self.model_inputs.B)
         self.beta2.assign(self.model_inputs.beta2)
         self.adot_prime_func.assign(project(self.adot_prime, self.V_cg))
         self.width.assign(self.model_inputs.width)
 
 
-    def step(self):
-        if self.i < self.steps:
-            self.update_inputs(self.i, self.t, float(self.L0), float(self.dt))
+    def try_step(self, dt, adot0):
+        # Assign the smb parameter
+        self.dt.assign(dt)
+        self.update_inputs(self.i, self.t, float(self.L0), dt, adot0)
+        #plot(self.adot_prime_func, interactive = True)
 
-            #plot(self.width, interactive = True)
+        try:
+            self.assigner.assign(self.U, [self.zero_guess, self.zero_guess,self.H0_c, self.H0, self.L0])
+            solver = NonlinearVariationalSolver(self.problem)
+            solver.parameters.update(self.snes_params)
+            solver.solve()
+        except:
+            solver = NonlinearVariationalSolver(self.problem)
+            solver.parameters.update(self.snes_params)
+            solver.parameters['newton_solver']['error_on_nonconvergence'] = False
+            solver.parameters['newton_solver']['relaxation_parameter'] = 0.9
+            solver.parameters['newton_solver']['report'] = True
+            #self.assigner.assign(self.U, [self.zero_guess, self.zero_guess,self.H0_c, self.H0, self.L0])
+            solver.solve()
 
-            try:
-                self.assigner.assign(self.U, [self.zero_guess, self.zero_guess,self.H0_c, self.H0, self.L0])
-                solver = NonlinearVariationalSolver(self.problem)
-                solver.parameters.update(self.snes_params)
-                solver.solve()
-            except:
-                solver = NonlinearVariationalSolver(self.problem)
-                solver.parameters.update(self.snes_params)
-                solver.parameters['newton_solver']['error_on_nonconvergence'] = False
-                solver.parameters['newton_solver']['relaxation_parameter'] = 0.9
-                solver.parameters['newton_solver']['report'] = True
-                #self.assigner.assign(self.U, [self.zero_guess, self.zero_guess,self.H0_c, self.H0, self.L0])
-                solver.solve()
+        # Update previous solutions
+        self.assigner_inv.assign([self.un_temp, self.u2n_temp, self.H0_c_temp, self.H0_temp, self.L0_temp], self.U)
 
-            # Update previous solutions
-            self.assigner_inv.assign([self.un,self.u2n, self.H0_c, self.H0, self.L0], self.U)
-            # Print current time, max thickness, and adot parameter
-            print self.t, self.H0.vector().max(), float(self.L0)
-            # Update time
-            self.t += float(self.dt)
-            self.i += 1
 
-            return float(self.L0)
+        print self.t, self.H0_temp.vector().max(), float(self.L0_temp)
+        return float(self.L0_temp)
+        """
+        # Print current time, max thickness, and adot parameter
+        print self.t, self.H0.vector().max(), float(self.L0)
+        # Update time
+        self.t += float(self.dt)
+        self.i += 1
+
+        return float(self.L0)"""
 
 
     # Write out a steady state file
