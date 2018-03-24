@@ -6,14 +6,17 @@ from filterpy.kalman import MerweScaledSigmaPoints
 from sigma_points import *
 
 
-adot_inputs = AdotInputsElevationDependent()
-inputs = Inputs('is_steady_elevation_dependent_width.hdf5', adot_inputs)
-model = ForwardIceModel(inputs, "out", "L_dist")
+
 
 
 """
 Force the ice sheet to retreat at a constant rate of speed.
 """
+
+### Setup the model
+adot_inputs = AdotInputsElevationDependent()
+inputs = Inputs('is_steady_elevation_dependent_width.hdf5', adot_inputs)
+model = ForwardIceModel(inputs, "out", "L_dist")
 
 """
 
@@ -47,7 +50,7 @@ quit()
 
 points = SigmaPointsScalar(alpha = 0.1, beta = 2., kappa = 2.)
 
-sigma_points = points.sigma_points(0.50942564589, 0.05)
+sigma_points = points.sigma_points(0.50942564589, 0.1)
 
 #print points.mean_weights
 #print
