@@ -4,13 +4,12 @@ from model.adot_inputs_elevation_dependent import *
 from model.forward_model.forward_ice_model import *
 import matplotlib.pyplot as plt
 from sigma_points import *
-from gaussian import *
 
 """
-Computes sigma points for a scalar Gaussian.
+Simple unscented Kalman filter
 """
 
-class KalmanFilter(object):
+class UKF(object):
 
     def __init__(self):
 
@@ -68,10 +67,11 @@ class KalmanFilter(object):
     def step(self):
         self.t += 1.
 
-        ### Run the sigma points through the measruement model
-        ########################################################################
-        sigma_points = self.sigma_point_generator.sigma_points(self.adot0_mean, self.adot0_variance)
+        x_bar, P_bar, Y = self.predict()
 
+        print x_bar, P_bar, Y
+
+        """
         Ls = []
         for adot0 in sigma_points:
             Ls.append(model.try_step(1., adot0))
@@ -94,7 +94,7 @@ class KalmanFilter(object):
 
 
         # Residual
-        y = L_obs.mu - L_mu
+        y = L_obs.mu - L_mu"""
 
 
     # Return a random variable representing the observation at the given time
@@ -114,4 +114,4 @@ class KalmanFilter(object):
         return points
 
 kalman = KalmanFilter()
-kalman.predict()
+kalman.step()

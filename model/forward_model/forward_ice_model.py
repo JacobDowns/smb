@@ -251,7 +251,7 @@ class ForwardIceModel(object):
         self.width.assign(self.model_inputs.width)
 
 
-    def try_step(self, dt, adot0):
+    def try_step(self, dt, adot0, accept = False):
         # Assign the smb parameter
         self.dt.assign(dt)
         self.update_inputs(self.i, self.t, float(self.L0), dt, adot0)
@@ -268,23 +268,22 @@ class ForwardIceModel(object):
             solver.parameters['newton_solver']['error_on_nonconvergence'] = False
             solver.parameters['newton_solver']['relaxation_parameter'] = 0.9
             solver.parameters['newton_solver']['report'] = True
-            #self.assigner.assign(self.U, [self.zero_guess, self.zero_guess,self.H0_c, self.H0, self.L0])
             solver.solve()
 
-        # Update previous solutions
-        self.assigner_inv.assign([self.un_temp, self.u2n_temp, self.H0_c_temp, self.H0_temp, self.L0_temp], self.U)
-
-
-        print self.t, self.H0_temp.vector().max(), float(self.L0_temp)
-        return float(self.L0_temp)
-        """
-        # Print current time, max thickness, and adot parameter
-        print self.t, self.H0.vector().max(), float(self.L0)
-        # Update time
-        self.t += float(self.dt)
-        self.i += 1
-
-        return float(self.L0)"""
+        # Accept this step
+        if accept :
+            # Update time
+            self.t += float(self.dt)
+            self.i += 1
+            # Update previous solutions
+            self.assigner_inv.assign([self.un, self.u2n, self.H0_c, self.H0, self.L0], self.U)
+            print "real step: ", self.t, self.H0.vector().max(), float(self.L0)
+            return float(self.L0)
+        else :
+            # This was just a trial step, don't advance time
+            self.assigner_inv.assign([self.un_temp, self.u2n_temp, self.H0_c_temp, self.H0_temp, self.L0_temp], self.U)
+            #print self.t, self.H0_temp.vector().max(), float(self.L0_temp)
+            return float(self.L0_temp)
 
 
     # Write out a steady state file

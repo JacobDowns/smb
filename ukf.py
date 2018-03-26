@@ -4,25 +4,24 @@ from model.adot_inputs_elevation_dependent import *
 from model.forward_model.forward_ice_model import *
 import matplotlib.pyplot as plt
 from sigma_points import *
-from gaussian import *
 
 """
-Computes sigma points for a scalar Gaussian.
+Simple unscented Kalman filter
 """
 
-class KalmanFilter(object):
+class UKF(object):
 
     def __init__(self):
 
         ### Setup the model
         adot_inputs = AdotInputsElevationDependent()
         inputs = Inputs('is_steady_elevation_dependent_width.hdf5', adot_inputs)
-        model = ForwardIceModel(inputs, "out", "L_dist")
+        self.model = ForwardIceModel(inputs, "out", "L_dist")
 
         # SMB parameter mean
         self.adot0_mu = 0.50942564589
         # SMB parameter variance
-        self.adot0_sigma2 = 0.000000001
+        self.adot0_sigma2 = 1.
         # Initial time
         self.t = 0.0
         # Time step
@@ -33,8 +32,9 @@ class KalmanFilter(object):
         self.retreat_rate = -25.
         # Object for calculating sigma points
         self.mwer_sigma = SigmaPointsScalar(alpha = 0.1, beta = 2., kappa = 2.)
+        # Process variance
+        self.Q = 0.05
 
-        self.Y = None
 
     # Process model
     def F(self, x):
@@ -44,7 +44,9 @@ class KalmanFilter(object):
     def H(self, x):
         L = np.zeros(len(x))
         for i in range(len(x)):
-            L[i] = model.try_step(self.dt, x)
+            L[i] = self.model.try_step(self.dt, x[i])
+
+        return L
 
 
     ### Add a little noise to the smb
@@ -52,58 +54,58 @@ class KalmanFilter(object):
         """
         Run the process model to get the prior. (Just adds noise.)
         """
-
         # Run sigma points through process model
         sigma_points = self.mwer_sigma.sigma_points(self.adot0_mu, self.adot0_sigma2)
         Y = self.F(sigma_points)
         # Prior mean
-        adot0_mu = np.dot(self.mwer_sigma.mean_weights, Y)
-        # Prior covariance
-        adot0_sigma2 = np.dot(self.mwer_sigma.variance_weights, (Y - adot0_mu)**2) + 0.1
+        x_bar = np.dot(self.mwer_sigma.mean_weights, Y)
+        # Prior variance
+        P_bar = np.dot(self.mwer_sigma.variance_weights, (Y - x_bar)**2) + self.Q
 
-        return adot0_mu, adot0_sigma2, Y
+        return x_bar, P_bar, Y
 
 
     ### Update
     def step(self):
         self.t += 1.
 
-        ### Run the sigma points through the measruement model
+        ### Compute state mean and covariance
         ########################################################################
-        sigma_points = self.sigma_point_generator.sigma_points(self.adot0_mean, self.adot0_variance)
-
-        Ls = []
-        for adot0 in sigma_points:
-            Ls.append(model.try_step(1., adot0))
-
-        Ls = np.array(Ls)
-        # Measurement mean
-        L_mu = np.dot(self.sigma_point_generator.mean_weights, np.array(Ls))
-        # Observation mean and variance
-        (L_obs_mu, L_obs_sigma2) = self.get_obs(self.t)
+        # Run process model to get the prior
+        x_bar, P_bar, Y = self.predict()
+        # Run the mesurement model
+        L = self.H(Y)
+        # Observation mean
+        mu_z = np.dot(self.mwer_sigma.mean_weights, L)
+        # Get the observation mean and variance
+        z, R = self.get_obs(self.t)
         # Residual
-        y = obs_mu - L_mu
-        # Measurement covariance
-        L_sigma2 = np.dot(self.sigma_point_generator.variance_weights, (Ls - L_mu)**2) + L_obs_sigma2
+        y = z - mu_z
+        # Measurement variance
+        P_z = np.dot(self.mwer_sigma.variance_weights, (L - mu_z)**2) + R
         # Kalman gain
-        adot0_mu = self.belief.mu
-        K = np.dot(self.sigma_point_generator.variance_weights, (sigma_points - adot0_mu)*(Ls - L_mu)) * (1. / L_sigma2)
+        K = np.dot(self.mwer_sigma.variance_weights, (Y - x_bar)*(L - mu_z)) * (1. / P_z)
+        # State mean
+        x = x_bar + K*y
+        # State variance
+        P = P_bar - K*P_z*K
 
-        adot0_mu += K*y
+        ### Take a real step in the model using the "optimal" SMB param
+        ########################################################################
+        self.adot_mu = x
+        self.adot_sigma2 = P
+        L = self.model.try_step(self.dt, self.adot_mu, accept = True)
+
+        print x, abs(z-L)
+        return x, L, abs(z-L)
 
 
 
-        # Residual
-        y = L_obs.mu - L_mu
 
-
-    # Return a random variable representing the observation at the given time
+    # Mean and variance of observation at a given time
     def get_obs(self, t):
-
-
-        ### Compute the mean and variance of the observation at the current time
         mu = self.L_init + self.retreat_rate*t
-        sigma = (1500.0*np.sin( 2.*np.pi*t / 2000.) + 250.0) / 2.
+        sigma = (2000.0*np.sin( 2.*np.pi*t / 2000.) + 500.0) / 2.
 
         return (mu, sigma**2)
 
@@ -113,5 +115,22 @@ class KalmanFilter(object):
         points = np.array([mean - np.sqrt((1. + self.lam)*variance), mean, mean + np.sqrt((1. + self.lam)*variance)])
         return points
 
-kalman = KalmanFilter()
-kalman.predict()
+kalman = UKF()
+
+adots = []
+Ls = []
+difs = []
+
+for i in range(1000):
+    adot, L, dif = kalman.step()
+    adots.append(adot)
+    difs.append(dif)
+    Ls.append(L)
+
+print adots
+print
+print Ls
+print
+print difs
+plt.plot(adots)
+plt.show()
