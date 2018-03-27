@@ -19,9 +19,9 @@ class UKF(object):
         self.model = ForwardIceModel(inputs, "out", "L_dist")
 
         # SMB parameter mean
-        self.adot0_mu = 0.50942564589
+        self.adot0_mu = 0.#0.50942564589
         # SMB parameter variance
-        self.adot0_sigma2 = 1.
+        self.adot0_sigma2 = 1.5
         # Initial time
         self.t = 0.0
         # Time step
@@ -33,12 +33,13 @@ class UKF(object):
         # Object for calculating sigma points
         self.mwer_sigma = SigmaPointsScalar(alpha = 0.1, beta = 2., kappa = 2.)
         # Process variance
-        self.Q = 0.05
+        #self.Q = 0.0005
 
 
     # Process model
     def F(self, x):
         return x
+
 
     # Measurement Model
     def H(self, x):
@@ -60,7 +61,7 @@ class UKF(object):
         # Prior mean
         x_bar = np.dot(self.mwer_sigma.mean_weights, Y)
         # Prior variance
-        P_bar = np.dot(self.mwer_sigma.variance_weights, (Y - x_bar)**2) + self.Q
+        P_bar = np.dot(self.mwer_sigma.variance_weights, (Y - x_bar)**2) + self.get_Q(self.t) #self.Q
 
         return x_bar, P_bar, Y
 
@@ -96,24 +97,23 @@ class UKF(object):
         self.adot_sigma2 = P
         L = self.model.try_step(self.dt, self.adot_mu, accept = True)
 
-        print x, abs(z-L)
-        return x, L, abs(z-L)
-
-
+        print x, z-L
+        return x, L, z-L
 
 
     # Mean and variance of observation at a given time
     def get_obs(self, t):
         mu = self.L_init + self.retreat_rate*t
-        sigma = (2000.0*np.sin( 2.*np.pi*t / 2000.) + 500.0) / 2.
+        #sigma =
 
+        sigma = 300.*(1. - (1./(t+1.))) #+ abs((500.*np.sin(2.*np.pi*t / 2000.0) / 2.)
+        print "R", sigma
         return (mu, sigma**2)
 
 
-
-    def sigma_points(self, mean, variance):
-        points = np.array([mean - np.sqrt((1. + self.lam)*variance), mean, mean + np.sqrt((1. + self.lam)*variance)])
-        return points
+    def get_Q(self, t):
+        # Allow for more variance earlier on
+        return (1. / 500.)*(0.2 + 0.0005*t)/(1. + t)
 
 kalman = UKF()
 
@@ -121,7 +121,7 @@ adots = []
 Ls = []
 difs = []
 
-for i in range(1000):
+for i in range(2500):
     adot, L, dif = kalman.step()
     adots.append(adot)
     difs.append(dif)
