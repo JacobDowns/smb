@@ -97,7 +97,7 @@ class UKF(object):
         self.adot_sigma2 = P
         L = self.model.try_step(self.dt, self.adot_mu, accept = True)
 
-        print x, z-L
+        print x, P, z-L
         return x, L, z-L
 
 
@@ -106,14 +106,16 @@ class UKF(object):
         mu = self.L_init + self.retreat_rate*t
         #sigma =
 
-        sigma = 300.*(1. - (1./(t+1.))) #+ abs((500.*np.sin(2.*np.pi*t / 2000.0) / 2.)
+        sigma = 500.*(1. - (1./(t+1.))) # + abs((500.*np.sin(2.*np.pi*(t - 2300.) / 100.0))
+        if (t >= 2300.) and (t <= 2700.):
+            sigma += 700.*np.sin( (2.*np.pi*(t - 2300.)) / 800.)
         print "R", sigma
         return (mu, sigma**2)
 
 
     def get_Q(self, t):
         # Allow for more variance earlier on
-        return (1. / 500.)*(0.2 + 0.0005*t)/(1. + t)
+        return (1. / 750.)*(0.2 + 0.00000005*t)/(1. + t)
 
 kalman = UKF()
 
