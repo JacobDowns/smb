@@ -45,7 +45,7 @@ ph_adot, = ax[1].plot(xs, adot.compute_vertex_values(), 'k', linewidth = 2.5)
 #ax[1].plot(xs, 0.0*xs, 'b', linewidth = 2.5)
 ax[1].set_ylim(-2.5, 1.5)
 ax[1].set_xlim(0, inputs.L_init / 1000.)
-ax[1].set_xlabel('x (m)')
+ax[1].set_xlabel('x (km)')
 ax[1].set_ylabel('smb (m/a)')
 
 lines.append(ph_bed)
