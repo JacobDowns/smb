@@ -55,6 +55,15 @@ Q = delta * (1. / h**2) * Q
 
 for i in range(N):
     try :
+        ### Add random noise to the observation points
+        ########################################################################
+
+
+        obs_ts = np.array([1000., 2000., 3000., 4000., 5000.])
+
+
+        np.interp([0, 1, 1.5, 2.72, 3.14], xp, fp)
+
         ### Add noise to the length offset
         noise = np.random.multivariate_normal(np.zeros(num_int_points), np.linalg.inv(Q), num_obs_points - 1).flatten()
         random_offsets = np.zeros(len(offsets))

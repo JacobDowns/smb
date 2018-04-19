@@ -18,16 +18,13 @@ ts = np.linspace(0., float(years), years)
 for i in range(num_samples):
     print i
     try :
-        rates = np.loadtxt('sample_rates/' + str(i) + '.txt')
-        lengths = np.loadtxt('sample_lengths/' + str(i) + '.txt')
+        rates = np.loadtxt('sample_rates1/' + str(i) + '.txt')
+        lengths = np.loadtxt('sample_lengths1/' + str(i) + '.txt')
         plt.plot(lengths)
     except:
         pass
 
 plt.show()
-quit()
-
-
 
 
 rate_mat = np.zeros((num_samples, years))
@@ -39,11 +36,11 @@ for i in range(num_samples):
 
     try :
         print i
-        rates = np.loadtxt('sample_rates/' + str(i) + '.txt')
-        lengths = np.loadtxt('sample_lengths/' + str(i) + '.txt')
+        rates = np.loadtxt('sample_rates1/' + str(i) + '.txt')
+        lengths = np.loadtxt('sample_lengths1/' + str(i) + '.txt')
 
         # Save the lapse rate in units of cm / (km a)
-        rate_mat[j, :] = ((rates / lengths) * 1000.)
+        rate_mat[j, :] = rates
         length_mat[j, :] = lengths
         j += 1
     except :
@@ -51,26 +48,25 @@ for i in range(num_samples):
 
 print rate_mat[0:j,:]
 
-np.savetxt('sample_rates/rates.txt', rate_mat[0:j, :])
-np.savetxt('sample_lengths/lengths.txt', length_mat[0:j, :])
+np.savetxt('sample_rates1/rates.txt', rate_mat[0:j, :])
+np.savetxt('sample_lengths1/lengths.txt', length_mat[0:j, :])
 
-quit()"""
+quit()
+
+"""
 
 
-
-
-rate_mat = np.loadtxt('sample_rates/rates.txt')
-length_mat = np.loadtxt('sample_lengths/lengths.txt')
+rate_mat = np.loadtxt('sample_rates1/rates.txt')
+length_mat = np.loadtxt('sample_lengths1/lengths.txt')
 
 print rate_mat
 print length_mat
 
 import numpy as np, scipy.stats as st
 
-"""
-for i in range(num_samples):
-    print i
-    plt.plot(ts, rate_mat[i,:])"""
+#for i in range(num_samples):
+#    print i
+#    plt.plot(ts, rate_mat[i,:])
 
 r_l = np.zeros(years)
 r_u = np.zeros(years)
@@ -117,14 +113,15 @@ ax.grid(linewidth=1)
 
 
 fig.show()
-
-
-#np.histogram([1, 2, 1], bins=[0, 1, 2, 3])
-
-fig.savefig('rate.png', dpi = 300)
-
+fig.savefig('rate1.png', dpi = 300)
 
 """
+#np.histogram([1, 2, 1], bins=[0, 1, 2, 3])
+
+
+
+
+
 #print r_mean
 
 plt.plot(ts, r_mean, 'k', lw = 4)
