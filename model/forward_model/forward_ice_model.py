@@ -2,8 +2,11 @@
 from dolfin import *
 from support.physical_constants import *
 from support.momentum_form import *
+#from support.momentum_form_fixed_domain import *
 from support.mass_form import *
+#from support.mass_form_fixed_domain import *
 from support.length_form import *
+import matplotlib.pyplot as plt
 
 parameters['form_compiler']['cpp_optimize'] = True
 parameters["form_compiler"]["representation"] = "uflacs"
@@ -12,7 +15,7 @@ parameters['allow_extrapolation'] = True
 
 class ForwardIceModel(object):
 
-    def __init__(self, model_inputs, out_dir, checkpoint_file):
+    def __init__(self, model_inputs, out_dir, checkpoint_file, model_options = {}):
 
         # Model inputs object
         self.model_inputs = model_inputs
@@ -22,6 +25,11 @@ class ForwardIceModel(object):
         self.t = 0.
         # Physical constants / parameters
         self.constants = pcs
+        # Model options dictionary
+        self.model_options = model_options
+        # Max domain length
+        #if 'fix_domain' in model_options:
+        #    self.fix_domain = model_options['fix_domain']
 
 
         #### Function spaces
@@ -34,11 +42,13 @@ class ForwardIceModel(object):
         E_cg = self.model_inputs.E_cg
         E_dg = self.model_inputs.E_dg
         E_r =  self.model_inputs.E_r
+        # Mixed element for full problem
         E_V = MixedElement(E_cg, E_cg, E_cg, E_dg, E_r)
 
         V_cg = self.model_inputs.V_cg
         V_dg = self.model_inputs.V_dg
-        V_r = FunctionSpace(self.mesh, E_r)
+        V_r =  self.model_inputs.V_r
+        # Function space for full problem
         V = FunctionSpace(self.mesh, E_V)
 
         # For moving data between vector functions and scalar functions
@@ -123,9 +133,10 @@ class ForwardIceModel(object):
         # Assign initial ice sheet length from data
         L0.vector()[:] = model_inputs.L_init
         # Initialize initial thickness
-        H0.assign(model_inputs.H0)
+        H0.assign(model_inputs.input_functions['H0'])
         #H0.vector()[:] += 1.0
-        H0_c.assign(model_inputs.H0_c)
+        H0_c.assign(model_inputs.input_functions['H0_c'])
+
         # Initialize guesses for unknowns
         self.assigner.assign(U, [self.zero_guess, self.zero_guess, H0_c, H0, L0])
 
@@ -144,14 +155,15 @@ class ForwardIceModel(object):
         P_0 = Constant(self.constants['rho']*self.constants['g'])*H_c
         # Water pressure
         #P_w = Constant(self.constants['rho_w']*self.constants['g'])*B
-        P_w = Constant(0.8)*P_0
+        P_w = Constant(0.7)*P_0
         # Effective pressure
         N = P_0 - P_w
+        # CG ice thickness at last time step
+        self.S0_c = Function(self.V_cg)
         # SMB expression
-        self.adot_prime = model_inputs.get_adot_exp(S_dg)
+        self.adot_prime = model_inputs.get_adot_exp(self.S0_c)
         # SMB as a function
         self.adot_prime_func = Function(self.V_cg)
-
 
         self.S = S
         self.dLdt = dLdt
@@ -162,7 +174,14 @@ class ForwardIceModel(object):
         self.N = N
 
 
-        ### Variational Forms
+        ### Initialize inputs
+        ########################################################################
+
+        self.update_inputs(model_inputs.L_init)
+        self.S0_c.assign(self.B + self.H0_c)
+
+
+        ### Variational forms
         ########################################################################
 
         # Momentum balance residual
@@ -193,24 +212,13 @@ class ForwardIceModel(object):
         ffc_options = {"optimize": True}
         problem = NonlinearVariationalProblem(R, U, bcs=[], J=J, form_compiler_parameters = ffc_options)
 
-        """
-        # Solver parameters
-        self.snes_params = {'nonlinear_solver': 'snes',
-                      'snes_solver': {
-                      'relative_tolerance' : 1e-13,
-                      'absolute_tolerance' : 1e-5,
-                       'linear_solver': 'mumps',
-                       'maximum_iterations': 75,
-                       'report' : False
-                       }}"""
-
         self.snes_params = {'nonlinear_solver': 'newton',
                       'newton_solver': {
                        'relative_tolerance' : 5e-14,
                        'absolute_tolerance' : 7e-5,
                        'linear_solver': 'mumps',
                        'maximum_iterations': 100,
-                       'report' : False
+                       'report' : True
                        }}
 
         self.problem = problem
@@ -221,8 +229,6 @@ class ForwardIceModel(object):
 
         # Get the time step from input file
         self.dt.assign(self.model_inputs.dt)
-        # Number of steps
-        self.steps = self.model_inputs.N
         # Iteration count
         self.i = 0
 
@@ -237,44 +243,49 @@ class ForwardIceModel(object):
 
 
     # Assign input functions from model_inputs
-    def update_inputs(self, i, t, L, dt):
-        print i, t, L
-        self.model_inputs.update_inputs(i, t, L, dt)
-        self.B.assign(self.model_inputs.B)
-        self.beta2.assign(self.model_inputs.beta2)
+    def update_inputs(self, L):
+        print "update inputs", L
+        self.model_inputs.update_inputs(L)
+        self.B.assign(self.model_inputs.input_functions['B'])
+        self.beta2.assign(self.model_inputs.input_functions['beta2'])
         self.adot_prime_func.assign(project(self.adot_prime, self.V_cg))
-        self.width.assign(self.model_inputs.width)
+        self.width.assign(self.model_inputs.input_functions['B'])
 
 
     def step(self):
-        if self.i < self.steps:
-            self.update_inputs(self.i, self.t, float(self.L0), float(self.dt))
 
-            #plot(self.width, interactive = True)
+        self.update_inputs(float(self.L0))
 
-            try:
-                self.assigner.assign(self.U, [self.zero_guess, self.zero_guess,self.H0_c, self.H0, self.L0])
-                solver = NonlinearVariationalSolver(self.problem)
-                solver.parameters.update(self.snes_params)
-                solver.solve()
-            except:
-                solver = NonlinearVariationalSolver(self.problem)
-                solver.parameters.update(self.snes_params)
-                solver.parameters['newton_solver']['error_on_nonconvergence'] = False
-                solver.parameters['newton_solver']['relaxation_parameter'] = 0.9
-                solver.parameters['newton_solver']['report'] = True
-                #self.assigner.assign(self.U, [self.zero_guess, self.zero_guess,self.H0_c, self.H0, self.L0])
-                solver.solve()
+        dolfin.plot(self.B + self.H0_c)
+        plt.show()
+        quit()
 
-            # Update previous solutions
-            self.assigner_inv.assign([self.un,self.u2n, self.H0_c, self.H0, self.L0], self.U)
-            # Print current time, max thickness, and adot parameter
-            print self.t, self.H0.vector().max(), float(self.L0)
-            # Update time
-            self.t += float(self.dt)
-            self.i += 1
+        try:
+            print "sadf"
+            self.assigner.assign(self.U, [self.zero_guess, self.zero_guess,self.H0_c, self.H0, self.L0])
+            solver = NonlinearVariationalSolver(self.problem)
+            solver.parameters.update(self.snes_params)
+            solver.solve()
+            print "sfsfsd"
+        except:
+            print "there"
+            solver = NonlinearVariationalSolver(self.problem)
+            solver.parameters.update(self.snes_params)
+            solver.parameters['newton_solver']['error_on_nonconvergence'] = False
+            solver.parameters['newton_solver']['relaxation_parameter'] = 0.9
+            solver.parameters['newton_solver']['report'] = True
+            #self.assigner.assign(self.U, [self.zero_guess, self.zero_guess,self.H0_c, self.H0, self.L0])
+            solver.solve()
 
-            return float(self.L0)
+        # Update previous solutions
+        self.assigner_inv.assign([self.un,self.u2n, self.H0_c, self.H0, self.L0], self.U)
+        # Print current time, max thickness, and adot parameter
+        print self.t, self.H0.vector().max(), float(self.L0)
+        # Update time
+        self.t += float(self.dt)
+        self.i += 1
+
+        return float(self.L0)
 
 
     # Write out a steady state file

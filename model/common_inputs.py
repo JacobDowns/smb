@@ -1,6 +1,6 @@
 from dolfin import *
 import numpy as np
-from bed_inputs import *
+from scipy.interpolate import UnivariateSpline
 
 """
 Flexible class for generating a forward model inputs file.
@@ -8,61 +8,116 @@ Flexible class for generating a forward model inputs file.
 
 class CommonInputs(object):
 
-    def __init__(self, input_file_name, adot_inputs):
+    def __init__(self, input_file_name, input_options = {}):
+
+        # Dictionary of extra input options
+        self.input_options = input_options
+
 
         ### Mesh and function spaces
         ########################################################################
 
+        # Load mesh
         self.mesh = Mesh()
-        input_file = HDF5File(self.mesh.mpi_comm(), input_file_name, "r")
+        input_file = HDF5File(self.mesh.mpi_comm(), input_file_name, "a")
         self.input_file = input_file
         input_file.read(self.mesh, "/mesh", False)
+        # Store mesh coordinates
         self.mesh_coords = self.mesh.coordinates()[:,0]
-
+        # Define function spaces
         self.E_cg = FiniteElement('CG', self.mesh.ufl_cell(), 1)
         self.E_dg = FiniteElement('DG', self.mesh.ufl_cell(), 0)
         self.E_r = FiniteElement('R',  self.mesh.ufl_cell(), 0)
         self.V_cg = FunctionSpace(self.mesh, self.E_cg)
         self.V_dg = FunctionSpace(self.mesh, self.E_dg)
         self.V_r = FunctionSpace(self.mesh, self.E_r)
+        # A dictionary of all model inputs
+        self.input_functions = {}
 
 
-        ### Initialize inputs
+        ### CG inputs
         ########################################################################
 
-        # Bed function
-        self.B = Function(self.V_cg)
-        # Width
-        self.width = Function(self.V_cg)
-        # Load bed data from the input file
-        self.bed_inputs = BedInputs(self, input_file)
-        # Store the bed mesh and data
-        self.B_mesh = self.bed_inputs.mesh
-        self.B_data = self.bed_inputs.B
-        # Store the width data
-        self.width_data = self.bed_inputs.width
+        if 'cg_fields' in input_options:
+            self.cg_fields = input_options['cg_fields']
+            self.interp_fields = set(self.cg_fields).intersection(set(input_options['interp_fields']))
+        else :
+            # Default CG fields
+            self.cg_fields = ['H0_c', 'B', 'width', 'beta2']
+
+            # Any additional fields
+            if 'additional_cg_fields' in input_options:
+                self.cg_fields += input_options['additional_cg_fields']
+
+            self.interp_fields = set(['B', 'width', 'beta2'])
+            if 'additional_interp_fields' in input_options:
+                self.interp_fields = self.interp_fields.union(set(self.cg_fields).intersection(set(input_options['additional_interp_fields'])))
+
+            print "interp fields"
+            print self.interp_fields
+
+        # Load all CG inputs
+        for field_name in self.cg_fields:
+            self.input_functions[field_name] = Function(self.V_cg)
+            input_file.read(self.input_functions[field_name], field_name)
+
+
+        ### DG inputs
+        ########################################################################
+
+        if 'dg_fields' in input_options:
+            self.dg_fields = input_options['dg_fields']
+        else :
+            # Default DG fields
+            self.dg_fields = ['H0']
+            # Any additional fields
+            if 'additional_dg_fields' in input_options:
+                self.dg_fields += self.dg_fields['additional_dg_fields']
+
+        # Load all DG inputs
+        for field_name in self.dg_fields:
+            self.input_functions[field_name] = Function(self.V_dg)
+            input_file.read(self.input_functions[field_name], field_name)
+
+
+        ### R inputs
+        ########################################################################
+
+        if 'r_fields' in input_options:
+            # Domain len is non-optional
+            self.r_fields = set(['domain_len'])
+            self.r_fields = self.r_fields.union(set(input_options['r_fields']))
+        else :
+            # Default DG fields
+            self.r_fields = ['L0', 'domain_len']
+            # Any additional fields
+            if 'additional_r_fields' in input_options:
+                self.r_fields += self.dg_fields['additional_r_fields']
+
+        # Load all R inputs
+        for field_name in self.r_fields:
+            self.input_functions[field_name] = Function(self.V_r)
+            input_file.read(self.input_functions[field_name], field_name)
+
         # Store the domain length
-        self.domain_length = self.bed_inputs.domain_length_func
+        self.domain_len = float(self.input_functions['domain_len'])
 
-        # DG thickness
-        self.H0 = Function(self.V_dg)
-        input_file.read(self.H0, "H0")
 
-        # CG thickness
-        self.H0_c = Function(self.V_cg)
-        input_file.read(self.H0_c, "H0_c")
+        ### Create interpolated CG fields
+        ########################################################################
 
-        # Basal traction
-        self.beta2 = Function(self.V_cg)
-        self.beta2.assign(Constant(1e-3))
+        # Dictionary of interpolated functions
+        self.interp_functions = {}
+        # Get the mesh coordinates
+        self.mesh_coords = self.mesh.coordinates()[:,0]
+        # Normalize so that coordinates go from 0 to 1
+        self.mesh_coords /= self.mesh_coords.max()
 
-        # Initial glacier length
-        self.L0 = Function(self.V_r)
-        input_file.read(self.L0, "L0")
-        self.L_init = float(self.L0)
+        # Create interpolated functions
+        for field_name in self.interp_fields:
+            self.interp_functions[field_name] = UnivariateSpline(self.mesh_coords, project(self.input_functions[field_name]).compute_vertex_values(), k = 3, s =  1)
 
-        # Object that encapsulates an smb expression
-        self.adot_inputs = adot_inputs
+        self.update_interp_all(self.domain_len / 5.)
 
 
         #### Create boundary facet function
@@ -78,14 +133,24 @@ class CommonInputs(object):
                self.boundaries[f] = 2
 
 
-    # Update inputs that change with length, iteration, time, and time step
-    def update_inputs(self, i, t, L, dt):
-        # Assign bed function
-        self.bed_inputs.update(L)
-        # Update adto expression
-        self.adot_inputs.update(t, L)
+    # Update all inputs that depend on glacier length L
+    def update_interp_all(self, L):
+        frac = L / self.domain_len
+
+        for field_name in self.interp_fields:
+            self.input_functions[field_name].vector()[:] = \
+             np.ascontiguousarray(self.interp_functions[field_name](self.mesh_coords * frac)[::-1])
+
+    # Update only the given fields
+    def update_interp_fields(self, field_names, L):
+        frac = L / self.domain_len
+
+        for field_name in field_names:
+            self.input_functions[field_name].vector()[:] = \
+             np.ascontiguousarray(self.interp_functions[field_name](self.mesh_coords * frac)[::-1])
 
 
-    # Return the smb expression, just ignore the surface
-    def get_adot_exp(self, S, adot_param = None):
-        return self.adot_inputs.get_adot_exp(S, adot_param)
+    # Get value of interpolated field at a point
+    def get_interp_value(self, field_name, x):
+        frac = x / self.domain_len
+        return self.interp_functions[field_name](frac)
