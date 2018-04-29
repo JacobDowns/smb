@@ -179,6 +179,7 @@ class ForwardIceModel(object):
 
         self.update_inputs(model_inputs.L_init)
         self.S0_c.assign(self.B + self.H0_c)
+        self.update_inputs(model_inputs.L_init)
 
 
         ### Variational forms
@@ -217,7 +218,7 @@ class ForwardIceModel(object):
                        'relative_tolerance' : 5e-14,
                        'absolute_tolerance' : 7e-5,
                        'linear_solver': 'mumps',
-                       'maximum_iterations': 100,
+                       'maximum_iterations': 25,
                        'report' : True
                        }}
 
@@ -245,30 +246,26 @@ class ForwardIceModel(object):
     # Assign input functions from model_inputs
     def update_inputs(self, L):
         print "update inputs", L
+        self.S0_c.assign(self.B + self.H0_c)
         self.model_inputs.update_inputs(L)
         self.B.assign(self.model_inputs.input_functions['B'])
         self.beta2.assign(self.model_inputs.input_functions['beta2'])
         self.adot_prime_func.assign(project(self.adot_prime, self.V_cg))
-        self.width.assign(self.model_inputs.input_functions['B'])
+        self.width.assign(self.model_inputs.input_functions['width'])
+
 
 
     def step(self):
 
+        # Update length dependent inputs
         self.update_inputs(float(self.L0))
 
-        dolfin.plot(self.B + self.H0_c)
-        plt.show()
-        quit()
-
         try:
-            print "sadf"
             self.assigner.assign(self.U, [self.zero_guess, self.zero_guess,self.H0_c, self.H0, self.L0])
             solver = NonlinearVariationalSolver(self.problem)
             solver.parameters.update(self.snes_params)
             solver.solve()
-            print "sfsfsd"
         except:
-            print "there"
             solver = NonlinearVariationalSolver(self.problem)
             solver.parameters.update(self.snes_params)
             solver.parameters['newton_solver']['error_on_nonconvergence'] = False
@@ -279,6 +276,7 @@ class ForwardIceModel(object):
 
         # Update previous solutions
         self.assigner_inv.assign([self.un,self.u2n, self.H0_c, self.H0, self.L0], self.U)
+        # Update the elevation, which is
         # Print current time, max thickness, and adot parameter
         print self.t, self.H0.vector().max(), float(self.L0)
         # Update time

@@ -12,7 +12,7 @@ divide.
 # Initial glacier length
 L_init = 400e3
 # Maximum ice thickness
-H_max = 3000.
+H_max = 3500.
 
 
 ### Load bed inputs
@@ -32,29 +32,16 @@ H0 = Function(inputs.V_cg)
 # DG thickness
 H0_c = Function(inputs.V_dg)
 # Get the bed elevation at the desired terminus position
-B_term = inputs.get_interp_value('B', float(inputs.input_functions['domain_len']) - L_init)
+B_term = inputs.get_interp_value('B', L_init)
 inputs.update_interp_all(L_init)
 
-"""
 # Surface expression
 class SExp(Expression):
     def eval(self,values,x):
-        values[0] = np.sqrt((H_max + B_term)**2*(1. - x[0])) + B_term"""
+        values[0] = np.sqrt((H_max + B_term)**2*(1. - x[0])) + B_term
 
-# Surface expression
-class SExp(Expression):
-    def eval(self,values,x):
-        values[0] = np.sqrt((H_max + B_term)**2*x[0]) + B_term
 
 S = project(SExp(degree = 1), inputs.V_cg)
-
-
-
-print inputs.input_functions['B'].vector().array()
-
-print B_term
-quit()
-
 # Compute initial thickness
 H0_c.assign(project(S - inputs.input_functions['B'], inputs.V_cg))
 # As DG function
@@ -62,16 +49,6 @@ H0.assign(project(H0_c, inputs.V_dg))
 # Initial glacier length
 L0 = Function(inputs.V_r)
 L0.assign(Constant(L_init))
-
-
-#dolfin.plot(S)
-#plt.show()
-print H0_c.vector().array()
-dolfin.plot(H0_c)
-plt.show()
-
-
-quit()
 
 
 ### Width and basal tractions

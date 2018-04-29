@@ -3,17 +3,14 @@ from model.forward_model.forward_ice_model import *
 import matplotlib.pyplot as plt
 
 
-model_inputs = ForwardPaleoInputsSteady('paleo_inputs/is_flowline_300.h5')
+model_inputs = ForwardPaleoInputsSteady('paleo_inputs/is_flowline_new.h5')
 model = ForwardIceModel(model_inputs, "out", "paleo")
 
-dolfin.plot(model_inputs.input_functions['B'] + model_inputs.input_functions['H0_c'])
-print model_inputs.input_functions['H0_c'].vector().array()
-quit()
-#dolfin.plot(model_inputs.adot_)
-#plt.show()
+for i in range(2500):
+    model.step()
 
-
-model.step()
+dolfin.plot(model.S0_c)
+plt.show()
 
 
 

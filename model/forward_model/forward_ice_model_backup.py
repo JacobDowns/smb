@@ -216,6 +216,7 @@ class ForwardIceModel(object):
 
         self.update_inputs(model_inputs.L_init)
         self.S0_c.assign(self.B + self.H0_c)
+        self.update_inputs(model_inputs.L_init)
 
 
         ### Variational forms
@@ -292,10 +293,7 @@ class ForwardIceModel(object):
     def step(self):
 
         self.update_inputs(float(self.L0))
-        #dolfin.plot(self)
-        #plt.show()
-
-        print self.width.vector().array()
+        quit()
 
 
 

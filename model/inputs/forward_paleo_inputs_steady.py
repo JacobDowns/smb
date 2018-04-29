@@ -34,7 +34,7 @@ class ForwardPaleoInputsSteady(CommonInputs):
         # Initial glacier length
         self.L_init = float(self.input_functions['L0'])
         # Model time step (in years)
-        self.dt = 0.005
+        self.dt = 0.5
         # Object for calculating PDD's
         self.pdd_calc = PDDCalculator(5.5)
 
@@ -112,7 +112,7 @@ class ForwardPaleoInputsSteady(CommonInputs):
             yearly_snowfall += snowfall
 
 
-        self.adot.vector()[:] = yearly_snowfall
+        self.adot.vector()[:] = 0.0 #yearly_snowfall
 
 
     # Update inputs that change with length, iteration, time, and time step

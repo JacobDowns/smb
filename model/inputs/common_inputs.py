@@ -113,7 +113,7 @@ class CommonInputs(object):
         # Create interpolated functions
         for field_name in self.interp_fields:
             # Number of data points to skip between interpolated points - for smoothness
-            skip_smooth = 1
+            skip_smooth = 4
             self.interp_functions[field_name] = UnivariateSpline(self.mesh_coords[::skip_smooth], project(self.input_functions[field_name]).compute_vertex_values()[::skip_smooth], k = 3, s =  1)
 
         self.update_interp_all(self.domain_len)
@@ -121,14 +121,14 @@ class CommonInputs(object):
 
         #### Create boundary facet function
         ########################################################################
-        self.boundaries = FacetFunctionSizet(self.mesh, 0)
-        #self.boundaries = MeshFunction('size_t', self.mesh, self.mesh.topology().dim() - 1, 0)
+        #self.boundaries = FacetFunctionSizet(self.mesh, 0)
+        self.boundaries = MeshFunction('size_t', self.mesh, self.mesh.topology().dim() - 1, 0)
 
         for f in facets(self.mesh):
-            if near(f.midpoint().x(), 0):
+            if near(f.midpoint().x(), 1):
                 # Terminus
                self.boundaries[f] = 1
-            if near(f.midpoint().x(), 1):
+            if near(f.midpoint().x(), 0):
                # Divide
                self.boundaries[f] = 2
 
