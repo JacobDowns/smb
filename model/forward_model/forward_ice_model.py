@@ -4,6 +4,7 @@ from support.physical_constants import *
 from support.momentum_form import *
 from support.mass_form import *
 from support.length_form import *
+import matplotlib.pyplot as plt
 
 parameters['form_compiler']['cpp_optimize'] = True
 parameters["form_compiler"]["representation"] = "uflacs"
@@ -207,9 +208,9 @@ class ForwardIceModel(object):
         self.snes_params = {'nonlinear_solver': 'newton',
                       'newton_solver': {
                        'relative_tolerance' : 5e-14,
-                       'absolute_tolerance' : 7e-5,
+                       'absolute_tolerance' : 8e-5,
                        'linear_solver': 'mumps',
-                       'maximum_iterations': 100,
+                       'maximum_iterations': 12,
                        'report' : False
                        }}
 
@@ -250,8 +251,6 @@ class ForwardIceModel(object):
         if self.i < self.steps:
             self.update_inputs(self.i, self.t, float(self.L0), float(self.dt))
 
-            #plot(self.width, interactive = True)
-
             try:
                 self.assigner.assign(self.U, [self.zero_guess, self.zero_guess,self.H0_c, self.H0, self.L0])
                 solver = NonlinearVariationalSolver(self.problem)
@@ -261,7 +260,7 @@ class ForwardIceModel(object):
                 solver = NonlinearVariationalSolver(self.problem)
                 solver.parameters.update(self.snes_params)
                 solver.parameters['newton_solver']['error_on_nonconvergence'] = False
-                solver.parameters['newton_solver']['relaxation_parameter'] = 0.9
+                solver.parameters['newton_solver']['relaxation_parameter'] = 0.85
                 solver.parameters['newton_solver']['report'] = True
                 #self.assigner.assign(self.U, [self.zero_guess, self.zero_guess,self.H0_c, self.H0, self.L0])
                 solver.solve()

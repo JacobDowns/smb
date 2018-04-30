@@ -91,9 +91,9 @@ class GenInputs(object):
 
 inputs_dict = {}
 inputs_dict['cell_count'] = 1200
-inputs_dict['bed_file_name'] = '../forward_inputs/is_mesh_new.h5'
-inputs_dict['L_init'] = 390e3
-inputs_dict['H_max'] = 2450.
-inputs_dict['out_file'] = '../forward_inputs/is_inputs_width'
+inputs_dict['bed_file_name'] = 'is_bed_old.h5'
+inputs_dict['L_init'] = 300e3
+inputs_dict['H_max'] = 2000.
+inputs_dict['out_file'] = '../forward_inputs/is_old'
 
 gi = GenInputs(inputs_dict)
