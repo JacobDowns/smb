@@ -10,23 +10,25 @@ divide.
 """
 
 # Initial glacier length
-L_init = 400e3
+L_init = 470e3
 # Maximum ice thickness
-H_max = 3500.
+H_max = 2500.
 
 
 ### Load bed inputs
 ################################################################################
+
 input_options = {}
 input_options['cg_fields'] = ['B']
 input_options['interp_fields'] = ['B']
 input_options['r_fields'] = []
 input_options['dg_fields'] = []
-inputs = CommonInputs('is_flowline_new.h5', input_options)
+inputs = CommonInputs('is1.h5', input_options)
 
 
 ### Initialize ice thickness
 ################################################################################
+
 # Continuous thickness
 H0 = Function(inputs.V_cg)
 # DG thickness

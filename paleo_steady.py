@@ -3,14 +3,22 @@ from model.forward_model.forward_ice_model import *
 import matplotlib.pyplot as plt
 
 
-model_inputs = ForwardPaleoInputsSteady('paleo_inputs/is_flowline_new.h5')
+model_inputs = ForwardPaleoInputsSteady('paleo_inputs/is1.h5', dt = 0.5)
 model = ForwardIceModel(model_inputs, "out", "paleo")
 
-for i in range(2500):
+for i in range(5000):
     model.step()
 
-dolfin.plot(model.S0_c)
-plt.show()
+    if i % 100 == 0 or i == 341*2:
+        dolfin.plot(model.S0_c)
+        dolfin.plot(model.B)
+        plt.show()
+
+
+
+
+
+
 
 
 

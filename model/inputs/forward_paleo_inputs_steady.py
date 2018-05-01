@@ -11,7 +11,7 @@ Inputs for steady state paleo run.
 
 class ForwardPaleoInputsSteady(CommonInputs):
 
-    def __init__(self, input_file_name):
+    def __init__(self, input_file_name, dt = 1.):
 
         ### Load monthly modern temp. and precip. fields
         ########################################################################
@@ -34,7 +34,7 @@ class ForwardPaleoInputsSteady(CommonInputs):
         # Initial glacier length
         self.L_init = float(self.input_functions['L0'])
         # Model time step (in years)
-        self.dt = 0.5
+        self.dt = dt
         # Object for calculating PDD's
         self.pdd_calc = PDDCalculator(5.5)
 
@@ -111,8 +111,7 @@ class ForwardPaleoInputsSteady(CommonInputs):
             snowfall = precip_vec * (1./12.) * snowfall_frac
             yearly_snowfall += snowfall
 
-
-        self.adot.vector()[:] = 0.0 #yearly_snowfall
+        self.adot.vector()[:] = yearly_snowfall
 
 
     # Update inputs that change with length, iteration, time, and time step
