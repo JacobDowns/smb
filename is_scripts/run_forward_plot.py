@@ -26,9 +26,8 @@ xs = inputs.mesh.coordinates() * inputs.L_init
 L_init = inputs.L_init
 
 bed = project(model.B)
-surface = project(model.S)
+surface = project(model.S0_c)
 adot = project(model.adot_prime_func)
-bed = project(inputs.B)
 
 ph_bed, = ax[0].plot(xs, bed.compute_vertex_values(), 'b', linewidth = 2.5)
 ph_surface, = ax[0].plot(xs, surface.compute_vertex_values(), 'k', linewidth = 2.5)

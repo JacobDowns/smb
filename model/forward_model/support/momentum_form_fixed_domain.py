@@ -70,7 +70,7 @@ class MomentumFormFixedDomain(object):
         # Surface
         S = model.S_f
         # Effective pressure
-        N = model.N
+        N = model.N_f
         # Facet normal vector
         nhat = FacetNormal(model.mesh)
 

@@ -129,7 +129,6 @@ class InverseIceModel(object):
 
         # Initialize initial thickness
         H0.assign(model_inputs.H0)
-        #H0.vector()[:] += 1.0
         H0_c.assign(model_inputs.H0_c)
         # Initialize adot
         adot0.assign(Constant(2.))

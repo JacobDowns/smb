@@ -49,14 +49,19 @@ class CommonInputs(object):
             if 'additional_cg_fields' in input_options:
                 self.cg_fields += input_options['additional_cg_fields']
 
-            self.interp_fields = set(['B', 'width', 'beta2'])
+            self.interp_fields = set(['B', 'width', 'beta2', 'S_ref'])
             if 'additional_interp_fields' in input_options:
                 self.interp_fields = self.interp_fields.union(set(self.cg_fields).intersection(set(input_options['additional_interp_fields'])))
 
+        # For interpolated CG functions, we want to store the original function as well
+        self.original_cg_functions = {}
+
         # Load all CG inputs
         for field_name in self.cg_fields:
+            self.original_cg_functions[field_name] = Function(self.V_cg)
             self.input_functions[field_name] = Function(self.V_cg)
             input_file.read(self.input_functions[field_name], field_name)
+            input_file.read(self.original_cg_functions[field_name], field_name)
 
 
         ### DG inputs
@@ -112,11 +117,9 @@ class CommonInputs(object):
 
         # Create interpolated functions
         for field_name in self.interp_fields:
+            skip_smooth = 1
             # Number of data points to skip between interpolated points - for smoothness
-            skip_smooth = 4
-            self.interp_functions[field_name] = UnivariateSpline(self.mesh_coords[::skip_smooth], project(self.input_functions[field_name]).compute_vertex_values()[::skip_smooth], k = 3, s =  1)
-
-        self.update_interp_all(self.domain_len)
+            self.interp_functions[field_name] = UnivariateSpline(self.mesh_coords, project(self.input_functions[field_name]).compute_vertex_values(), k = 3, s =  0.005)
 
 
         #### Create boundary facet function
@@ -126,11 +129,13 @@ class CommonInputs(object):
 
         for f in facets(self.mesh):
             if near(f.midpoint().x(), 1):
-                # Terminus
+               # Terminus
                self.boundaries[f] = 1
+               #self.boundaries[f] = 2
             if near(f.midpoint().x(), 0):
                # Divide
                self.boundaries[f] = 2
+               #self.boundaries[f] = 1
 
 
     # Update all inputs that depend on glacier length L
@@ -140,6 +145,7 @@ class CommonInputs(object):
         for field_name in self.interp_fields:
             self.input_functions[field_name].vector()[:] = \
              np.ascontiguousarray(self.interp_functions[field_name](self.mesh_coords * frac)[::-1])
+
 
     # Update only the given fields
     def update_interp_fields(self, field_names, L):

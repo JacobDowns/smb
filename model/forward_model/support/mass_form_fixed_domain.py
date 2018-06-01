@@ -24,8 +24,7 @@ class MassFormFixedDomain(object):
         adot_prime = model.adot_prime
         # Ice stream width
         width = model.width
-        # Spatial coordinate
-        x_spatial = SpatialCoordinate(model.mesh)
+        width = Constant(5e3)
         # Flux velocity
         q_vel = ubar
         # Flux
@@ -40,4 +39,11 @@ class MassFormFixedDomain(object):
         R_mass += uH*jump(xsi)*dS
         R_mass += q_flux*xsi*ds1(1)
 
+        self.form = q_flux*xsi*ds1(1)
+        self.L = L
+
         self.R_mass = R_mass
+
+
+    def print_form(self):
+        print float(self.L)

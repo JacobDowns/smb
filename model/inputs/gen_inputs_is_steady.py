@@ -10,7 +10,7 @@ divide.
 """
 
 # Initial glacier length
-L_init = 470e3
+L_init = 406878.12855486432
 # Maximum ice thickness
 H_max = 2500.
 
@@ -23,7 +23,7 @@ input_options['cg_fields'] = ['B']
 input_options['interp_fields'] = ['B']
 input_options['r_fields'] = []
 input_options['dg_fields'] = []
-inputs = CommonInputs('is1.h5', input_options)
+inputs = CommonInputs('is_paleo.h5', input_options)
 
 
 ### Initialize ice thickness
@@ -40,8 +40,7 @@ inputs.update_interp_all(L_init)
 # Surface expression
 class SExp(Expression):
     def eval(self,values,x):
-        values[0] = np.sqrt((H_max + B_term)**2*(1. - x[0])) + B_term
-
+        values[0] = np.sqrt((H_max + B_term)**2*(1. - 0.9999*x[0])) + B_term + 10.
 
 S = project(SExp(degree = 1), inputs.V_cg)
 # Compute initial thickness

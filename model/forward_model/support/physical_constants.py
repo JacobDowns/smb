@@ -14,7 +14,7 @@ pcs['n'] = 3.0
 # Sliding law exponent
 pcs['m'] = 3.0
 # Ice hardness
-pcs['b'] = 1e-17**(-1./pcs['n'])
+pcs['b'] = 5e-18**(-1./pcs['n'])
 # Basal sliding law constants:
 pcs['mu'] = Constant(1.0)
 pcs['A_s'] = Constant(pcs['rho']*pcs['g']*315.0/500.)

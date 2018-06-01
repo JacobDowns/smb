@@ -56,10 +56,16 @@ class CommonInputs(object):
             print "interp fields"
             print self.interp_fields
 
+
+        # For interpolated CG functions, we want to store the original function as well
+        self.original_cg_functions = {}
+
         # Load all CG inputs
         for field_name in self.cg_fields:
+            self.original_cg_functions[field_name] = Function(self.V_cg)
             self.input_functions[field_name] = Function(self.V_cg)
             input_file.read(self.input_functions[field_name], field_name)
+            input_file.read(self.original_cg_functions[field_name], field_name)
 
 
         ### DG inputs
