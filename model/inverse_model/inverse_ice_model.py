@@ -4,6 +4,7 @@ from support.physical_constants import *
 from support.momentum_form import *
 from support.mass_form import *
 from support.length_form1 import *
+import matplotlib.pyplot as plt
 
 parameters['form_compiler']['cpp_optimize'] = True
 parameters["form_compiler"]["representation"] = "uflacs"
@@ -15,7 +16,7 @@ parameters['allow_extrapolation'] = True
 
 class InverseIceModel(object):
 
-    def __init__(self, model_inputs, out_dir, replay_file, constants = None, set_forms = None):
+    def __init__(self, model_inputs, out_dir):
 
         # Model inputs object
         self.model_inputs = model_inputs
@@ -110,6 +111,7 @@ class InverseIceModel(object):
         beta2 = Function(V_cg)
         # Length
         L = Constant(0.0)
+        L.assign(model_inputs.L_init)
         # Rate of change of length
         dLdt = Constant(0.0)
         # Ice stream width
@@ -128,9 +130,8 @@ class InverseIceModel(object):
         ########################################################################
 
         # Initialize initial thickness
-        H0.assign(model_inputs.H0)
-        #H0.vector()[:] += 1.0
-        H0_c.assign(model_inputs.H0_c)
+        H0.assign(model_inputs.input_functions['H0'])
+        H0_c.assign(model_inputs.input_functions['H0_c'])
         # Initialize adot
         adot0.assign(Constant(2.))
         # Initialize guesses for unknowns
@@ -149,7 +150,7 @@ class InverseIceModel(object):
         # Overburden pressure
         P_0 = Constant(self.constants['rho']*self.constants['g'])*H_c
         # Water pressure
-        P_w = Constant(0.8)*P_0
+        P_w = Constant(0.75)*P_0
         # Effective pressure
         N = P_0 - P_w
         # Surface mass balance expression
@@ -211,93 +212,54 @@ class InverseIceModel(object):
         self.problem = problem
 
 
-        ### Start a replay file, that allows replaying the run in the forward model
-        ########################################################################
-        self.out_file = HDF5File(mpi_comm_world(), out_dir + '/' + replay_file + ".hdf5", 'w')
-
-        ### Write bed data
-        self.out_file.write(self.model_inputs.B_mesh, "B_mesh")
-        self.out_file.write(self.model_inputs.B_data, "B_data")
-        self.out_file.write(self.model_inputs.domain_length, "domain_length")
-
-        ### Write variables
-        self.out_file.write(self.mesh, "mesh")
-        self.out_file.write(self.H0, "H0")
-        self.out_file.write(self.H0_c, "H0_c")
-        L0_write = Function(self.V_r)
-        L0_write.assign(Constant(self.model_inputs.L_init))
-        self.out_file.write(L0_write, "L0")
-        self.out_file.write(self.boundaries, "boundaries")
-        self.out_file.flush()
-
-
-        ### Setup some stuff for time iteration
-        ########################################################################
-
-        # Get the time step from input file
-        self.dt.assign(self.model_inputs.dt)
-        # Number of steps
-        self.steps = self.model_inputs.N
-        # Iteration count
-        self.i = 0
-        # Write the time step we used
-        dt_write = Function(self.V_r)
-        dt_write.assign(self.dt)
-        self.out_file.write(dt_write, 'dt')
-
-
     # Assign input functions from model_inputs
-    def update_inputs(self, i, t, dt):
-        self.model_inputs.update_inputs(i, t, dt)
+    def update_inputs(self, L, t, dt):
+        self.model_inputs.update_inputs(L, t, dt)
+
+        print "update inputs", L, t, dt
         # Update time
-        self.L.assign(self.model_inputs.L)
-        self.dLdt.assign(self.model_inputs.dLdt)
-        self.B.assign(self.model_inputs.B)
-        self.beta2.assign(self.model_inputs.beta2)
-        self.width.assign(self.model_inputs.width)
+        self.L.assign(Constant(self.model_inputs.L))
+        self.dLdt.assign(Constant(self.model_inputs.dLdt))
+        self.B.assign(self.model_inputs.input_functions['B'])
+        self.beta2.assign(self.model_inputs.input_functions['beta2'])
+        self.adot_prime_func.assign(project(self.adot_prime, self.V_cg))
+        self.width.assign(self.model_inputs.input_functions['width'])
 
 
     # Take N steps of size dt
-    def step(self):
-        if self.i < self.steps:
-            # Update input functions which depend on length L
-            self.update_inputs(self.i, self.t,  float(self.dt))
+    def step(self, dt):
+        # Update input functions which depend on length L
+        self.dt.assign(dt)
+        self.update_inputs(float(self.L), self.t,  dt)
+        print self.t, float(self.L), float(self.adot0)
 
-            print self.i, self.t, float(self.L), float(self.adot0)
-            #plot(self.H0_c, interactive = True)
+        #dolfin.plot(self.B)
+        #dolfin.plot(self.S)
 
-            try:
-                solver = NonlinearVariationalSolver(self.problem)
-                solver.parameters.update(self.snes_params)
-                solver.solve()
-            except:
-                solver = NonlinearVariationalSolver(self.problem)
-                solver.parameters.update(self.snes_params)
-                solver.parameters['newton_solver']['error_on_nonconvergence'] = False
-                solver.parameters['newton_solver']['relaxation_parameter'] = 0.9
-                solver.parameters['newton_solver']['report'] = True
-                #self.assigner.assign(self.U, [self.zero_guess, self.zero_guess,self.H0_c, self.H0, self.adot0])
-                solver.solve()
+        try:
+            solver = NonlinearVariationalSolver(self.problem)
+            solver.parameters.update(self.snes_params)
+            solver.solve()
+        except:
+            solver = NonlinearVariationalSolver(self.problem)
+            solver.parameters.update(self.snes_params)
+            solver.parameters['newton_solver']['error_on_nonconvergence'] = False
+            solver.parameters['newton_solver']['relaxation_parameter'] = 0.9
+            solver.parameters['newton_solver']['report'] = True
+            solver.solve()
 
-            # Update previous solutions
-            self.assigner_inv.assign([self.un, self.u2n, self.H0_c, self.H0, self.adot0], self.U)
-            # Print current time, max thickness, and adot parameter
-            print self.t, self.H0.vector().max(), self.H0.vector().min(), float(self.adot0), float(self.dLdt)
-            # Write inputs for this time
-            #self.checkpoint()
-            self.adot_prime_func.assign(project(self.adot_prime, self.V_cg))
-            #plot(self.adot_prime_func, interactive = False)
+        # Update previous solutions
+        self.assigner_inv.assign([self.un, self.u2n, self.H0_c, self.H0, self.adot0], self.U)
+        # Print current time, max thickness, and adot parameter
+        print self.t, self.H0.vector().max(), self.H0.vector().min(), float(self.adot0), float(self.dLdt)
+        # Update time
+        self.t += float(self.dt)
+        
+        return float(self.adot0), float(self.L)
 
-            # Update time
-            self.t += float(self.dt)
-            self.i += 1
-
-            return float(self.adot0), float(self.L)
-
-
+    """
     # Reset the model so we can re-run the simulation
     def reset(self):
-
         print "reset"
         self.t = 0.0
         self.i = 0
@@ -307,14 +269,6 @@ class InverseIceModel(object):
         self.un.assign(self.zero_guess)
         self.u2n.assign(self.zero_guess)
         self.assigner.assign(self.U, [self.un, self.u2n, self.H0_c, self.H0, self.adot0])
-
-
-    # Write inputs for forward model
-    def checkpoint(self):
-        #self.adot_prime_func.assign(project(self.adot_prime, self.V_cg))
-        #self.out_file.write(self.adot_prime_func, "adot", self.t)
-        self.out_file.write(self.adot0, "adot0", self.t)
-        self.out_file.flush()
 
 
     # Write out a steady state file
@@ -336,4 +290,4 @@ class InverseIceModel(object):
         output_file.write(L0_write, "L0")
         output_file.write(self.boundaries, "boundaries")
         output_file.flush()
-        output_file.close()
+        output_file.close()"""

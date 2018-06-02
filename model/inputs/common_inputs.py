@@ -49,7 +49,7 @@ class CommonInputs(object):
             if 'additional_cg_fields' in input_options:
                 self.cg_fields += input_options['additional_cg_fields']
 
-            self.interp_fields = set(['B', 'width', 'beta2', 'S_ref'])
+            self.interp_fields = set(['B', 'width', 'beta2'])
             if 'additional_interp_fields' in input_options:
                 self.interp_fields = self.interp_fields.union(set(self.cg_fields).intersection(set(input_options['additional_interp_fields'])))
 
