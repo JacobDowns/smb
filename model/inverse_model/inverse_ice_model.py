@@ -268,26 +268,31 @@ class InverseIceModel(object):
         self.adot0.assign(Constant(2.))
         self.un.assign(self.zero_guess)
         self.u2n.assign(self.zero_guess)
-        self.assigner.assign(self.U, [self.un, self.u2n, self.H0_c, self.H0, self.adot0])
+        self.assigner.assign(self.U, [self.un, self.u2n, self.H0_c, self.H0, self.adot0])"""
 
 
     # Write out a steady state file
     def write_steady_file(self, output_file_name):
-        output_file = HDF5File(mpi_comm_world(), output_file_name + '.hdf5', 'w')
+      output_file = HDF5File(mpi_comm_world(), output_file_name + '.hdf5', 'w')
 
-        ### Write bed data
-        output_file.write(self.model_inputs.B_mesh, "B_mesh")
-        output_file.write(self.model_inputs.B_data, "B_data")
-        output_file.write(self.model_inputs.width_data, "width_data")
-        output_file.write(self.model_inputs.domain_length, "domain_length")
+      ### Write bed data
+      output_file.write(self.model_inputs.original_cg_functions['B'], 'B')
+      output_file.write(self.model_inputs.original_cg_functions['width'], 'width')
+      output_file.write(self.model_inputs.original_cg_functions['beta2'], 'beta2')
+      output_file.write(self.model_inputs.input_functions['domain_len'], 'domain_len')
 
-        ### Write variables
-        output_file.write(self.mesh, "mesh")
-        output_file.write(self.H0, "H0")
-        output_file.write(self.H0_c, "H0_c")
-        L0_write = Function(self.V_r)
-        L0_write.assign(self.L)
-        output_file.write(L0_write, "L0")
-        output_file.write(self.boundaries, "boundaries")
-        output_file.flush()
-        output_file.close()"""
+      ### Write variables
+      output_file.write(self.mesh, "mesh")
+      output_file.write(self.H0, "H0")
+      output_file.write(self.H0_c, "H0_c")
+      L0_write = Function(self.V_r)
+      L0_write.assign(self.L)
+      output_file.write(L0_write, "L0")
+      output_file.write(self.boundaries, "boundaries")
+      output_file.write(self.adot_prime_func, "adot_prime_func")
+      output_file.flush()
+
+      #for field in self.model_inputs.additional_cg_fields:
+      #    output_file.write(self.model_inputs.original_cg_functions[field], field)
+
+      output_file.close()

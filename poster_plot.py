@@ -5,11 +5,14 @@ from scipy.interpolate import UnivariateSpline
 import matplotlib.pyplot as plt
 from scipy.interpolate import interp1d
 
+plt.rcParams.update({'font.size': 22})
+
 
 ### Linearly interpolate between moraine postions
 ####################################################################
 
 moraine_ts = np.loadtxt('is_paleo/moraine_ts.txt')
+print moraine_ts
 moraine_Ls = np.loadtxt('is_paleo/moraine_Ls.txt')
 moraine_ts -= moraine_ts[0]
 ts = np.linspace(moraine_ts.min(), moraine_ts.max(), 100)
@@ -22,36 +25,56 @@ adot_inputs = AdotInputsElevationDependent()
 inputs = InverseInputs('paleo_inputs/inverse_steady.hdf5', L_offset, L_offset.derivative(), adot_inputs)
 model = InverseIceModel(inputs, 'out')
 
-Ls = []
-profiles = []
-adot_profiles = []
 
-adots = []
-for i in range(4299*3):
-    adot0, L = model.step(1./3.)
-    adots.append(adot0)
+profiles = np.loadtxt('poster_plot/profiles.txt')
+Ls = np.loadtxt('poster_plot/Ls.txt')
+adots = np.loadtxt('poster_plot/adots.txt')
 
-    if i % (100*3) == 0 or i == 4299*3:
-        print
-        print
-        surf = project(model.B + model.H0_c, model.V_cg)
-        profiles.append(surf.vector().get_local())
-        adot_profiles.append(model.adot_prime_func.vector().get_local())
-        Ls.append(L)
-        
-print np.array(profiles)
-print Ls
-
-np.savetxt('poster_plot/profiles.txt', np.array(profiles))
-np.savetxt('poster_plot/Ls.txt', np.array(Ls))
-np.savetxt('poster_plot/adots.txt', np.array(adots))
-np.savetxt('poster_plot/adot_profiles.txt', np.array(adot_profiles))
-
-quit()
-plt.plot(adots)
+plt.plot(adots, 'ko-')
 plt.show()
 
-print adots
+quit()
+
+print profiles
+model.update_inputs(inputs.L_init, 0., 1./3.)
+B_init = model.B.vector().get_local()
+L_init = inputs.L_init
+
+
+coords = model.mesh.coordinates()[:][:,0]
+print B_init
+print L_init
+print coords
+
+plt.plot(coords*L_init, B_init[::-1], linewidth = 4)
+
+
+indexes = (moraine_ts/100).astype(int)
+indexes[-1] = 42
+
+
+[-11600. -10200.  -9200.  -8200.  -7300.]
+labels = ['-11.6 ka', '-10.2 ka', '-9.2 ka', '-8.2 ka', '-7.3 ka']
+colors = ['k', 'r', 'g', 'y', 'c']
+
+j = 0
+for i in indexes:
+    L = Ls[i]
+    profile = profiles[i,:]
+    plt.plot(coords*L, profile[::-1], colors[j], linewidth = 3, label = labels[j])
+    j += 1
+
+plt.xlabel('x (m)')
+plt.ylabel('Elevation (m)')
+plt.xlim(0., L_init)
+plt.legend()
+plt.show()
+
+
+quit()
+
+
+
 
 
                                
